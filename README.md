@@ -1,11 +1,15 @@
 # PyROA
 
-PyROA is a tool for modelling quasar lightcurves where the variability is described using a running optimal average (ROA), and paramters are sampled using Markov Chain Monte Carlo (MCMC) techniques - specifically using emcee.
+PyROA is a tool for modelling quasar lightcurves where the variability is described using a running optimal average (ROA), and paramters are sampled using Markov Chain Monte Carlo (MCMC) techniques - specifically using emcee. Using a Bayesian approach, priors can be used on the sampled parameters.
 Currently it has three main uses:
 
 1. Determining the time delay between lightcurves at different wavelengths. 
-2. Intercalibrating lightcurves from multiple telescopes, merging them into a single lightcurve
+2. Intercalibrating lightcurves from multiple telescopes, merging them into a single lightcurve.
 3. Determining the time delay between images of lensed quasars, where the microlensing effects are also modelled.
+
+PyROA also includes a noise model, where there is a parameter for each lightcurve that adds extra variance to the flux measurments, to account for underestimated errors. This can be turned of if required.
+
+The code is easy to use with example jupyter notebooks provided, demonstrating each of the three main uses.
 
 
 
