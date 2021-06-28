@@ -1,5 +1,6 @@
 # PyROA
 
+## Overview
 PyROA is a tool for modelling quasar lightcurves where the variability is described using a running optimal average (ROA), and paramters are sampled using Markov Chain Monte Carlo (MCMC) techniques - specifically using emcee. Using a Bayesian approach, priors can be used on the sampled parameters.
 Currently it has three main uses:
 
@@ -13,5 +14,19 @@ The code is easy to use with example jupyter notebooks provided, demonstrating e
 
 
 
+## Installation
+
+
+
+
+
+
+
+## Usage
+
+
+
+
+## Citation
 
 
