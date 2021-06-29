@@ -61,7 +61,7 @@ When using data from multiple telescopes e.g from the Las Cumbres Observatory, t
 Similar to before this is ran by specifying a directory which contains each lightcurve as a .dat file with three columns: time, flux, flux_err. The files must be named: "objName_filter_scope.dat". Therefore to run the code after specifying the directory, provide the objName, the filter of the merged lightcurve, and a list of telescopes that are to be merged:
 
 ```` import PyROA
-datadir = "/F9_Lightcurves/"
+datadir = "/F9_lightcurves/"
 objName="F9"
 filter="B"
     
