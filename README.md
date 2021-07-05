@@ -111,6 +111,33 @@ Here the priors are just for delta and the extra error parameters in the form: p
 This outputs the merged lightcurve as a .dat file to the same directory as the one specified. A corner plot is also created from where the function is ran.
 The full list of options for the InterCalibrate function are:
 
+<strong> class InterCalibrate(datadir, objName, filter, scopes, priors, init_delta=1.0, sig_level = 4.0, Nsamples=15000, Nburnin=10000) </strong>
+
+<strong> Parameters: 
+    
+datadir : string :</strong> Directory of lightcurves in format "objName_filter_scope.dat"
+
+<strong> objName : string :</strong> Name of object in order to find lightcurve .dat files 
+
+<strong> filter : string :</strong> Name of filter of merged lightcurve.
+
+<strong> scopes : array :</strong> List of telescope names.
+
+<strong> priors : array :</strong> Array specifying the limits of uniform priors for the parameters. Exact formatting is explained above.
+
+<strong> init_delta : float :</strong> Initial values of delta.
+
+<strong> sig_level : float :</strong> The threshold in units of sigma, for the sigma clipping.
+
+<strong> Nsamples : int :</strong> The number of MCMC samples, per walker, for the fitting procedure. This value includes the burn-in 
+
+<strong> Nburnin : int :</strong> The number of Nsamples to be removed as burn-in. 
+
+
+
+
+
+
 
 ### Case 3: Measuring time delays between lensed quasar images
 To measure the time delay between lightcurves of lensed quasar images we use the function GravLensFit. This is ran in the same way as before where a directory is specified that contains .dat files of each of the lightcurves with three columns: time, mag, mag_err. Here the brightness is in magnitude and the function does the conversion where : flux = 3.0128e-5 10^(-0.4m). This converts into arbitrary flux units and so this factor can be changed depending on the data.
@@ -129,6 +156,13 @@ Here the priors are for:
 priors = [[A1_lower, A1_upper], [B1_lower, B1_upper], [tau_lower, tau_upper],[delta_lower, delta_upper], [sig_lower, sig_upper], [P_lower, P_upper]], where the A1 and B1 are the rms and mean of the first lightcurve in the arbitrary flux units, tau is the time delays between images, delta is the ROA window width, sig is the extra variance parameter and P is the prior range for all the microlensing polynomial coefficients.
 
 
+
+
+<strong> class GravLensFit(datadir, objName, images, priors, init_tau = None, init_delta=10.0, add_var=True, sig_level = 4.0, Nsamples=10000, Nburnin=5000, flux_convert_factor=3.0128e-5) </strong>
+
+<strong> Parameters: 
+    
+datadir : string :</strong> Directory of lightcurves in format "objName_image.dat"
 
 
 ## Citation
