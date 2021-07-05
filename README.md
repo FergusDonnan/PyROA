@@ -23,7 +23,7 @@ The code is easy to use with example jupyter notebooks provided, demonstrating e
 
 
 ## Usage
-#### Case 1: Measuring delays between lightcurves of different wavelengths
+### Case 1: Measuring delays between lightcurves of different wavelengths
 To measure the time delay between lightcurves of different wavelengths we first specify a directory, object name and filters. In the directory each lightcurve is a .dat file that contains three columns: time, flux, flux_err and is named: "objName_filter.dat". Using the mock data provided we would run the code using
 
 ```` import PyROA
@@ -52,10 +52,42 @@ Delta controls the flexability of the running optimal average which is calculate
 
 There are many more options that can be specified when using Fit. A full explanation is below:
 
+<strong> class Fit(datadir, objName, filters, priors, init_tau = None, init_delta=1.0, delay_dist=False, add_var=True, sig_level = 4.0, Nsamples=10000, Nburnin=5000, include_slow_comp=False, slow_comp_delta=30.0, calc_P=False) </strong>
+
+<strong> Parameters: 
+    
+datadir : string :</strong> Directory of lightcurves in format "objName_filter.dat". 
+
+<strong> objName : string :</strong> Name of object in order to find lightcurve .dat files 
+
+<strong> filters : array :</strong> List of filter names.
+
+<strong> priors : array :</strong> Array specifying the limits of uniform priors for the parameters. Exact formatting is explained above.
+
+<strong> init_tau : array :</strong> List of initial time delays. This can help reduce burn-in or find correct solution if delays are very large and lightcurves have little overlap.
+
+<strong> init_delta : float :</strong> Initial values of delta.
+
+<strong> delay_dist : bool :</strong> Whether to include a delay distribution for each time delay that blurs the lightcurve according to the width of the delay distribution. If set to True, each delay parameter now represents the mean of a Gaussian delay distribtuion and a new parameter, tau_rms, represents the width.
+
+<strong> add_var : bool :</strong> Whether to include paramters that add extra variance to the flux errors for each lightcurve. 
+
+<strong> sig_level : float :</strong> The threshold in units of sigma, for the sigma clipping.
+
+<strong> Nsamples : int :</strong> The number of MCMC samples, per walker, for the fitting procedure. This value includes the burn-in 
+
+<strong> Nburnin : int :</strong> The number of Nsamples to be removed as burn-in. 
+
+<strong> include_slow_comp : bool :</strong> Whether to include a slow varying component to the model, represented by a ROA with a fixed wide window function specified by slow_comp_delta.
+
+<strong> include_slow_comp : int :</strong> Width of the window function for the slow component if included. 
+
+<strong> calc_P : bool :</strong> Option to pre-calculate the number of parameters for the ROA as a function of delta, which is subsequently interpolated for use in the fitting routine. This option can increase run-time significantly for large data sets. WARNING: This is approximate as it does not account for the current time delay or extra variance parameters. Would recomend only using if delays are small and add_var = False.
 
 
 
-#### Case 2: Intercalibrating lightcurves from multiple telescopes
+
+### Case 2: Intercalibrating lightcurves from multiple telescopes
 
 When using data from multiple telescopes e.g from the Las Cumbres Observatory, these can be combined into a single lightcurve where the running optimal average provides a model of the merged lightcurve. 
 Similar to before this is ran by specifying a directory which contains each lightcurve as a .dat file with three columns: time, flux, flux_err. The files must be named: "objName_filter_scope.dat". Therefore to run the code after specifying the directory, provide the objName, the filter of the merged lightcurve, and a list of telescopes that are to be merged:
@@ -80,7 +112,7 @@ This outputs the merged lightcurve as a .dat file to the same directory as the o
 The full list of options for the InterCalibrate function are:
 
 
-#### Case 3: Measuring time delays between lensed quasar images
+### Case 3: Measuring time delays between lensed quasar images
 To measure the time delay between lightcurves of lensed quasar images we use the function GravLensFit. This is ran in the same way as before where a directory is specified that contains .dat files of each of the lightcurves with three columns: time, mag, mag_err. Here the brightness is in magnitude and the function does the conversion where : flux = 3.0128e-5 10^(-0.4m). This converts into arbitrary flux units and so this factor can be changed depending on the data.
 Here we specify images rather than filters:
 
