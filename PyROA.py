@@ -173,6 +173,132 @@ def RunningOptimalAverage2(t_data, Flux, Flux_err, delta, factors):
 
 
 
+
+@jit(nopython=True, cache=True, parallel=True)
+def RunningOptimalAverage3(t_data, Flux, Flux_err, delta, rmss):
+    #Inputs
+    # Flux : Array of data values
+    # Flux_err : Array containig errors of data values
+    # delta : parameter defining how "loose" memory function is
+    # t_data : Array of wavelength data values
+
+    
+    #Outputs
+    # t : List of model times 
+    # model : List of model fluxes calculated from running optimal average
+
+    mjd=t_data
+    model = np.empty(len(mjd))
+    errs = np.empty(len(mjd))
+     
+    for j in prange(len(mjd)):
+
+        deltas_full = np.sqrt(delta**2 + rmss[j]**2)
+        factors_full = np.sqrt(delta**2 + rmss[j]**2)/np.sqrt(delta**2 + rmss[j]**2+ (rmss[j]-rmss)**2)
+
+
+        #Only include significant data points
+        t_data_use = t_data[np.where(np.absolute(mjd[j]-t_data) < 5.0*deltas_full)[0]]
+        Flux_err_use = Flux_err[np.where(np.absolute(mjd[j]-t_data) < 5.0*deltas_full)[0]]
+        Flux_use = Flux[np.where(np.absolute(mjd[j]-t_data) < 5.0*deltas_full)[0]]
+        #deltas_full_use = deltas_full[np.where(np.absolute(mjd[j]-t_data) < 5.0*deltas_full)[0]]
+        factors_full_use = factors_full[np.where(np.absolute(mjd[j]-t_data) < 5.0*deltas_full)[0]]
+        
+
+        if (len(np.where(np.absolute(mjd[j]-t_data) < 5.0*deltas_full)[0])<1):
+            #Define Gaussian Memory Function
+            w = factors_full  * np.exp(-0.5*(((mjd[j]-t_data)/deltas_full)**2))/(Flux_err**2)
+        
+            #1/cosh Memory Function
+            #w = 1.0/((Flux_err_use**2)*np.cosh((t[j]-t_data_use)/delta))
+        
+            #Calculate optimal average
+            model[j] = np.nansum(Flux*w)/np.nansum(w)
+            #Calculate error
+            errs[j] = np.sqrt(1.0/np.nansum(w)) 
+
+
+        else:
+            #Define Gaussian Memory Function
+            w =factors_full_use* np.exp(-0.5*(((mjd[j]-t_data_use)/deltas_full)**2))/(Flux_err_use**2)
+        
+            #1/cosh Memory Function
+            #w = 1.0/((Flux_err_use**2)*np.cosh((t[j]-t_data_use)/delta))
+        
+            #Calculate optimal average
+            model[j] = np.nansum(Flux_use*w)/np.nansum(w)
+            #Calculate error
+            errs[j] = np.sqrt(1.0/np.nansum(w))
+        
+
+
+
+    return mjd, model, errs
+
+
+
+
+
+@jit(nopython=True, cache=True, parallel=True)
+def RunningOptimalAverageOut3(mjd, t_data, Flux, Flux_err, delta_new, tau_rms, rmss):
+    #Inputs
+    # Flux : Array of data values
+    # Flux_err : Array containig errors of data values
+    # delta : parameter defining how "loose" memory function is
+    # t_data : Array of wavelength data values
+
+    
+    #Outputs
+    # t : List of model times 
+    # model : List of model fluxes calculated from running optimal average
+
+
+    deltas_full = delta_new
+    factors_full = np.sqrt(delta_new**2)/np.sqrt(delta_new**2 + (tau_rms - rmss)**2)
+    model = np.empty(len(mjd))
+    errs = np.empty(len(mjd))
+     
+    for j in prange(len(mjd)):
+
+        #Only include significant data points
+        t_data_use = t_data[np.where(np.absolute(mjd[j]-t_data) < 5.0*deltas_full)[0]]
+        Flux_err_use = Flux_err[np.where(np.absolute(mjd[j]-t_data) < 5.0*deltas_full)[0]]
+        Flux_use = Flux[np.where(np.absolute(mjd[j]-t_data) < 5.0*deltas_full)[0]]
+        #deltas_full_use = deltas_full[np.where(np.absolute(mjd[j]-t_data) < 5.0*deltas_full)[0]]
+        factors_full_use = factors_full[np.where(np.absolute(mjd[j]-t_data) < 5.0*deltas_full)[0]]
+        
+
+        if (len(np.where(np.absolute(mjd[j]-t_data) < 5.0*deltas_full)[0])<1):
+            #Define Gaussian Memory Function
+            w = factors_full  * np.exp(-0.5*(((mjd[j]-t_data)/deltas_full)**2))/(Flux_err**2)
+        
+            #1/cosh Memory Function
+            #w = 1.0/((Flux_err_use**2)*np.cosh((t[j]-t_data_use)/delta))
+        
+            #Calculate optimal average
+            model[j] = np.nansum(Flux*w)/np.nansum(w)
+            #Calculate error
+            errs[j] = np.sqrt(1.0/np.nansum(w)) 
+
+
+        else:
+            #Define Gaussian Memory Function
+            w =factors_full_use* np.exp(-0.5*(((mjd[j]-t_data_use)/deltas_full)**2))/(Flux_err_use**2)
+        
+            #1/cosh Memory Function
+            #w = 1.0/((Flux_err_use**2)*np.cosh((t[j]-t_data_use)/delta))
+        
+            #Calculate optimal average
+            model[j] = np.nansum(Flux_use*w)/np.nansum(w)
+            #Calculate error
+            errs[j] = np.sqrt(1.0/np.nansum(w))
+        
+
+
+
+    return mjd, model, errs
+
+
 @jit(nopython=True, cache=True, parallel=True)
 def CalculateP(t_data, Flux, Flux_err, delta):
 
@@ -230,8 +356,8 @@ def CalculateP2(t_data, Flux, Flux_err, delta, factors):
         #Only include significant data points
         t_data_use = t_data[np.where(np.absolute(t_data[i]-t_data) < 5.0*delta)[0]]
         Flux_err_use = Flux_err[np.where(np.absolute(t_data[i]-t_data) < 5.0*delta)[0]]
-        delta_use = delta[np.where(np.absolute(t[j]-t_data) < 5.0*delta)[0]]
-        factors_use = factors[np.where(np.absolute(t[j]-t_data) < 5.0*delta)[0]]
+        delta_use = delta[np.where(np.absolute(t_data[i]-t_data) < 5.0*delta)[0]]
+        factors_use = factors[np.where(np.absolute(t_data[i]-t_data) < 5.0*delta)[0]]
                 
         if (len(np.where(np.absolute(t_data[i]-t_data) < 5.0*delta)[0])==0):
             #Define Gaussian Memory Function
@@ -255,6 +381,46 @@ def CalculateP2(t_data, Flux, Flux_err, delta, factors):
         Ps[i] = 1.0/((Flux_err[i]**2)*np.nansum(w))
 
     return np.nansum(Ps)
+    
+    
+@jit(nopython=True, cache=True, parallel=True)
+def CalculateP3(t_data, Flux, Flux_err, delta, rmss):
+
+    Ps = np.empty(len(t_data))
+    for i in prange(len(t_data)):
+    
+        deltas_full = np.sqrt(delta**2 + rmss[i]**2)
+        factors_full = np.sqrt(delta**2 + rmss[i]**2)/np.sqrt(delta**2 + rmss[i]**2+ (rmss[i]-rmss)**2)
+    
+        #Only include significant data points
+        t_data_use = t_data[np.where(np.absolute(t_data[i]-t_data) < 5.0*deltas_full)[0]]
+        Flux_err_use = Flux_err[np.where(np.absolute(t_data[i]-t_data) < 5.0*deltas_full)[0]]
+        #deltas_full_use = deltas_full[np.where(np.absolute(t_data[i]-t_data) < 5.0*deltas_full)[0]]
+        factors_full_use = factors_full[np.where(np.absolute(t_data[i]-t_data) < 5.0*deltas_full)[0]]
+                
+        if (len(np.where(np.absolute(t_data[i]-t_data) < 5.0*deltas_full)[0])==0):
+            #Define Gaussian Memory Function
+            w =factors_full* np.exp(-0.5*(((t_data[i]-t_data)/deltas_full)**2))/(Flux_err**2)
+
+            #1/cosh Memory function
+            #w = 1.0/((Flux_err_use**2)*np.cosh((t_data[i]-t_data_use)/delta))
+
+
+        else:
+        
+            #Define Gaussian Memory Function
+            w =factors_full_use * np.exp(-0.5*(((t_data[i]-t_data_use)/deltas_full)**2))/(Flux_err_use**2)
+
+            #1/cosh Memory function
+            #w = 1.0/((Flux_err_use**2)*np.cosh((t_data[i]-t_data_use)/delta))
+
+
+
+        #P= P + 1.0/((Flux_err[i]**2)*np.nansum(w))
+        Ps[i] = 1.0/((Flux_err[i]**2)*np.nansum(w))
+
+    return np.nansum(Ps)
+    
 
 
 
@@ -404,6 +570,17 @@ def RunningOptimalAverageOutp2(t_data, Flux, Flux_err, delta, factors):
 
 
     return t[0:int(gridsize)], model, errs    
+    
+    
+    
+    
+    
+
+    
+    
+    
+    
+    
         
 ############################################### Echo Mapping Model ####################################################
 
@@ -435,8 +612,8 @@ def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delt
     #Extract delta and extra variance parameters as last in params list
     if (delay_dist == True):
         delta = params_chunks[-1][0]
-        deltas = np.zeros(size)
-        factors = np.zeros(size)
+        rmss = np.zeros(size)
+
     
     else:
         delta = params_chunks[-1][0]
@@ -490,45 +667,53 @@ def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delt
         mjd = mjd - tau
 
 
-
-
-
         #Add shifted data to merged lightcurve
         for j in range(len(mjd)):
             merged_mjd[int(j+ prev)] = mjd[j]
             merged_flux[int(j+ prev)] = flux[j]
             merged_err[int(j+ prev)] = err[j]
             if (delay_dist == True):
-                deltas[int(j+ prev)] = delta#np.sqrt(delta**2 + tau_rms**2)
-                factors[int(j+ prev)] = delta/np.sqrt(delta**2 + tau_rms**2)#/delta
+                rmss[int(j+ prev)] = tau_rms
+               # factors[int(j+ prev)] = delta/np.sqrt(delta**2 + (tau_rms)**2)#/delta
      
         prev = int(prev + len(mjd))
         
 
-   # delta=init_delta
-    
+
+       
     #Calculate ROA to merged lc
-    
-    if (delay_dist == True):
-        t, m, errs = RunningOptimalAverage2(merged_mjd, merged_flux, merged_err, deltas, factors)
-    else:
+    if (delay_dist == False):
         t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta)
         
-            
-    if (P_func == None):
-        P=CalculateP(merged_mjd, merged_flux, merged_err, delta)
+        #Normalise lightcurve
+
+        m_mean = np.mean(m)#np.average(m, weights = 1.0/(errs**2))
+        m_rms = np.std(m)
+        m = (m-m_mean)/m_rms
+        errs = errs/m_rms
+        
+        
+        #Calculate no. of parameters
+        if (P_func == None):
+            P=CalculateP(merged_mjd, merged_flux, merged_err, delta)
+        else:
+            P = P_func(delta)
+         
+    #Calculate no. of paramters for delay_dist==True here, actual ROA calcualted in loop per lightcurve   
     else:
-        P = P_func(delta)
+        t,m,errs = RunningOptimalAverage3(merged_mjd, merged_flux, merged_err, delta, rmss)
+        P = CalculateP3(merged_mjd, merged_flux, merged_err, delta, rmss)
+        #Normalise lightcurve
 
-    #Normalise lightcurve
+        m_mean = np.mean(m)#np.average(m, weights = 1.0/(errs**2))
+        m_rms = np.std(m)
+        m = (m-m_mean)/m_rms
+        errs = errs/m_rms
 
-    m_mean = np.mean(m)#np.average(m, weights = 1.0/(errs**2))
-    m_rms = np.std(m)
-    m = (m-m_mean)/m_rms
-    errs = errs/m_rms
 
     #Calculate chi-squared for each lightcurve and sum
     lps=[0]*len(data)
+    prev=0
     for i in range(len(data)):
 
         A = params_chunks[i][0]
@@ -549,26 +734,45 @@ def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delt
 
 
 
-            
-        t_shifted = t + tau
-        interp = interpolate.interp1d(t_shifted, m, kind="linear", fill_value="extrapolate")
-        m_m = interp(t)
+        if (delay_dist == False):
+            t_shifted = t + tau
+            #interp = interpolate.interp1d(t_shifted, m, kind="linear", fill_value="extrapolate")
+            m_m = m#interp(t)
         
-        if (delay_dist == True and i>0):
-            tau_rms = params_chunks[i][3]
-            m_m = gaussian_filter1d(m_m, tau_rms)
-            
+
                     
-        if (include_slow_comp==True):
-            m_s = slow_comps[i](t) 
-            m_scaled = A*(m_m) + B + m_s
-        else:
-            m_scaled = A*(m_m) + B
+            if (include_slow_comp==True):
+                m_s = slow_comps[i](t_shifted) #Not sure - originally t not t_shifted
+                m_scaled = A*(m_m) + B + m_s
+            else:
+                m_scaled = A*(m_m) + B
 
          
-        #Model
-        interp = interpolate.interp1d(t, m_scaled, kind="linear", fill_value="extrapolate")
-        model = interp(mjd)
+            #Model
+            interp = interpolate.interp1d(t_shifted, m_scaled, kind="linear", fill_value="extrapolate")
+            model = interp(mjd)
+            
+        #Calculate ROA at mjd of each lightcurve using different delta
+        else:
+            tau_rms = params_chunks[i][3]
+            delta_new = np.sqrt(delta**2 + (tau_rms)**2)
+            factor = delta/np.sqrt(delta**2 + (tau_rms)**2)
+            
+            
+            Xs = m[prev : int(prev + len(mjd))]
+            errs = errs[prev : int(prev + len(mjd))]
+            
+            
+            if (include_slow_comp==True):
+                m_s = slow_comps[i](mjd)
+                
+                model = A*Xs + B + m_s
+            else:
+                model = A*Xs + B
+                     
+        prev = int(prev + len(mjd))
+            
+
         chi2 = np.empty(len(mjd))
         ex_term = np.empty(len(mjd))  
         for j in range(len(mjd)):
@@ -779,7 +983,7 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
             
             
         if (delay_dist == True):
-            pos_chunks[i][3] = 10.0
+            pos_chunks[i][3] = 1.0
             labels_chunks[i][3]="\u03C4_rms"+str(i)
                        
         labels_chunks[i][0] = "A"+str(i)
@@ -870,8 +1074,8 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
     #Extract delta and extra variance parameters as last in params list
     if (delay_dist == True):
         delta = np.percentile(samples_chunks[-1][0], [16, 50, 84])[1]
-        deltas = np.zeros(size)
-        factors = np.zeros(size)
+        rmss = np.zeros(size)
+
     
     else:
         delta = np.percentile(samples_chunks[-1][0], [16, 50, 84])[1]
@@ -936,8 +1140,8 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
             merged_flux[int(j+ prev)] = flux[j]
             merged_err[int(j+ prev)] = err[j]
             if (delay_dist == True):
-                deltas[int(j+ prev)] = delta#np.sqrt(delta**2 + tau_rms**2)
-                factors[int(j+ prev)] = delta/np.sqrt(delta**2 + tau_rms**2)#/delta
+                rmss[int(j+ prev)] = tau_rms
+                #factors[int(j+ prev)] = delta/np.sqrt(delta**2 + (tau_rms)**2)#/delta
      
         prev = int(prev + len(mjd))
     
@@ -952,22 +1156,93 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
         params=np.delete(params, [2])      
     
     #Calculate ROA to merged lc
-   # delta=init_delta
-    
-    if (delay_dist == True):
-        t, m, errs = RunningOptimalAverage2(merged_mjd, merged_flux, merged_err, deltas, factors)
-    else:
+
+    if (delay_dist == False):
         t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta)
-    #Normalise lightcurve
-    m_mean = np.mean(m)#np.average(m, weights = 1.0/(errs**2))
-    m_rms = np.std(m)
- #   if (delay_dist == True):
-   #     t, m, errs = RunningOptimalAverageOutp2(merged_mjd, merged_flux, merged_err, deltas, factors)
-  #  else:
-       # t, m, errs = RunningOptimalAverageOutp(merged_mjd, merged_flux, merged_err, delta)
-    m = (m-m_mean)/m_rms
-    errs = errs/m_rms
+
     
+    
+    
+        #Normalise lightcurve
+        m_mean = np.mean(m)#np.average(m, weights = 1.0/(errs**2))
+        m_rms = np.std(m)
+
+
+        m = (m-m_mean)/m_rms
+        errs = errs/m_rms
+        
+    else:
+        t,m,errs = RunningOptimalAverage3(merged_mjd, merged_flux, merged_err, delta, rmss)
+        #Calculate Norm. conditions 
+
+        m_mean = np.mean(m)
+        m_rms = np.std(m)
+       # m = (m-m_mean)/m_rms
+        #errs = errs/m_rms
+
+        
+        
+    #Output model for specific lightcurves    
+    models=[]
+    for i in range(len(data)):
+        mjd = data[i][:,0]
+        flux = data[i][:,1]
+        err = data[i][:,2]
+        
+        A = np.percentile(samples_chunks[i][0], [16, 50, 84])[1]
+        B = np.percentile(samples_chunks[i][1], [16, 50, 84])[1]
+        tau = np.percentile(samples_chunks[i][2], [16, 50, 84])[1]       
+        
+
+        if (delay_dist == False):
+            t_shifted = t + tau
+            #interp = interpolate.interp1d(t_shifted, m, kind="linear", fill_value="extrapolate")
+            m_m = m#interp(t)
+                    
+            if (include_slow_comp==True):
+                m_s = slow_comps[i](t_shifted) 
+                m_scaled = A*(m_m) + B + m_s
+            else:
+                m_scaled = A*(m_m) + B
+
+         
+            #Model
+           # interp = interpolate.interp1d(t, m_scaled, kind="linear", fill_value="extrapolate")
+            #model = interp(t)
+            #model errors
+            model_errs = errs*A
+            models.append([t_shifted, m_scaled, model_errs])
+            
+        
+            
+            
+            
+        else:
+            tau_rms = np.percentile(samples_chunks[i][3], [16, 50, 84])[1]
+            delta_new = np.sqrt(delta**2 + (tau_rms)**2)
+
+            
+            mx=max(merged_mjd)
+            mn=min(merged_mjd)
+            length = abs(mx-mn)
+            t = np.arange(mn, mx, length/(1000)) 
+            ts, Xs, errss = RunningOptimalAverageOut3(t, merged_mjd, merged_flux, merged_err, delta_new, tau_rms, rmss)
+
+            Xs = (Xs-m_mean)/m_rms
+            errss = errss/m_rms
+            
+            if (include_slow_comp==True):
+                m_s = slow_comps[i](t+tau)
+                
+                model = A*Xs + B + m_s
+            else:
+                model = A*Xs + B
+        
+            model_errs = errss*A
+            models.append([t+tau, model, model_errs])         
+            t,m,errs = models[0]
+                       
+
     print("Best Fit Parameters")
     table = [params]
     print(tabulate(table, headers=labels))
@@ -977,11 +1252,17 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
     pickle.dump(samples_flat,filehandler)
     filehandler = open(b"samples.obj","wb")
     pickle.dump(samples,filehandler)
-    filehandler = open(b"X_t.obj","wb")
-    pickle.dump([t, m, errs],filehandler)
+    if (delay_dist == False):
+        filehandler = open(b"X_t.obj","wb")
+        pickle.dump([t, m, errs],filehandler)
     if (include_slow_comp==True):      
         filehandler = open(b"Slow_Comps.obj","wb")
-        pickle.dump(slow_comps,filehandler)    
+        pickle.dump(slow_comps,filehandler)
+        
+    filehandler = open(b"Lightcurve_models.obj","wb")
+    pickle.dump(models,filehandler)
+    
+        
     
     
     #Plot Corner Plot
@@ -996,7 +1277,7 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
     
     
     #print("Autocorrelation time: ", sampler.get_autocorr_time())
-    return samples, samples_flat, t, m, errs, slow_comps, params
+    return samples, samples_flat, t, m, errs, slow_comps, params, models
 
 
 
@@ -1004,7 +1285,7 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
 
 
 class Fit():
-    def __init__(self, datadir, objName, filters, priors, init_tau = None, init_delta=1.0, delay_dist=False, add_var=False, sig_level = 4.0, Nsamples=10000, Nburnin=5000, include_slow_comp=False, slow_comp_delta=30.0, calc_P=False):
+    def __init__(self, datadir, objName, filters, priors, init_tau = None, init_delta=1.0, delay_dist=False, add_var=True, sig_level = 4.0, Nsamples=10000, Nburnin=5000, include_slow_comp=False, slow_comp_delta=30.0, calc_P=False):
         self.datadir=datadir
         self.objName=objName
         self.filters=filters
@@ -1012,8 +1293,8 @@ class Fit():
         for i in range(len(filters)):
             file = datadir + str(self.objName) +"_"+ str(self.filters[i]) + ".dat"
             data.append(np.loadtxt(file))         
-            data[i][:,1] = data[i][:,1]
-            data[i][:,2] = data[i][:,2]
+           # data[i][:,1] = data[i][:,1]
+           # data[i][:,2] = data[i][:,2]
            # np.savetxt(datadir + str(self.objName) +"_"+ str(self.filters[i]) + ".dat",np.transpose([data[i][:,0], data[i][:,1], data[i][:,2]]))
             
             
@@ -1054,6 +1335,7 @@ class Fit():
         if (self.include_slow_comp==True):
             self.slow_comps=run[5]
         self.params=run[6]
+        self.models = run[7]
         
         
         
@@ -1098,7 +1380,7 @@ def Plot(Fit):
     n = np.arange(0.05, 1.0 + 0.5/len(filters), 1.0/len(filters))
     for i in range(len(filters)):
         band_colors.append(cmap(n[i]))
-    band_colors=["royalblue", "darkcyan", "olivedrab", "#ff6f00", "#ef0000", "#610000"]
+
     samples_flat = Fit.samples_flat
     t = Fit.t
     X=Fit.X
@@ -1128,7 +1410,6 @@ def Plot(Fit):
     fig = plt.figure(100)
     gs = fig.add_gridspec(len(filters), 2, hspace=0, wspace=0, width_ratios=[5, 1])
     axs= gs.subplots(sharex='col')     
-    filters_latex = ["c3000","H$\\beta$", "H$\\alpha$", "HeII 4686", "MgII"]
     for j in range(len(filters)):
 
         #Read in parameter values
@@ -1147,46 +1428,18 @@ def Plot(Fit):
             sig = np.percentile(samples_chunks[j][-1], [16, 50, 84])[1]  
             err = np.sqrt(err**2 + sig**2)
         
-        #Shift X
-        t_shifted = t+tau
-        interp = interpolate.interp1d(t_shifted, X, kind="linear", fill_value="extrapolate")
-        X_shifted = interp(t)    
+        ts, model, errs = Fit.models[j]
         
-        if (Fit.delay_dist == True and j>0):
-            tau_rms = np.percentile(samples_chunks[j][3], [16, 50, 84])[1]
-            X_shifted = gaussian_filter1d(X_shifted, tau_rms)
 
-            
-        
-        
-        interp = interpolate.interp1d(t_shifted, X + errs, kind="linear", fill_value="extrapolate")   
-        X_shifted_up =  interp(t)      
-        if (Fit.delay_dist == True and j>0):
-            tau_rms =  np.percentile(samples_chunks[j][3], [16, 50, 84])[1]
-            X_shifted_up = gaussian_filter1d(X_shifted_up, tau_rms)
-            
-            
-        interp = interpolate.interp1d(t_shifted, X - errs, kind="linear", fill_value="extrapolate")   
-        X_shifted_down =  interp(t)
-        if (Fit.delay_dist == True and j>0):
-            tau_rms =  np.percentile(samples_chunks[j][3], [16, 50, 84])[1]
-            X_shifted_down = gaussian_filter1d(X_shifted_down, tau_rms)
-        
-        #Calculate model
-        if (Fit.include_slow_comp==True):
-            model = A*X_shifted + B + slow_comps[j](t)  
-        else:
-            model = A*X_shifted + B
-            
         axs[j][0].errorbar(mjd, flux , yerr=err, ls='none', marker=".", color=band_colors[j])
-        axs[j][0].plot(t, model, color="black")
-        axs[j][0].fill_between(t , A*(X_shifted_down ) + B,  A*(X_shifted_up) + B, facecolor="darkgrey", edgecolor='none', rasterized=True, antialiased=True)              
+        axs[j][0].plot(ts, model, color="black")
+        axs[j][0].fill_between(ts , model+errs,  model-errs, facecolor="darkgrey", edgecolor='none', rasterized=True, antialiased=True)              
         
         length=abs(max(flux)-min(flux))
         axs[j][0].set_ylim(min(flux)-0.2*length, max(flux)+0.2*length)
         axs[j][0].set_xlabel("MJD")
         
-        axs[j][0].annotate(filters_latex[j], xy=(0.85, 0.85), xycoords='axes fraction', size=15.0, color=band_colors[j], fontsize=20)         
+        axs[j][0].annotate(filters[j], xy=(0.85, 0.85), xycoords='axes fraction', size=15.0, color=band_colors[j], fontsize=20)         
         
         
         
@@ -1260,7 +1513,7 @@ def log_likelihood2(params, data, sig_level):
 
     
     #Calculate ROA to merged lc
-    t, m, errs = RunningOptimalAverage2(merged_mjd, merged_flux, merged_err, delta)
+    t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta)
     P=CalculateP(merged_mjd, merged_flux, merged_err, delta)
 
     
@@ -1480,7 +1733,7 @@ def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter):
     params.append([delta])
     params = list(chain.from_iterable(params))#Flatten into single array
     #Calculate ROA to merged lc
-    t, m, errs = RunningOptimalAverage2(merged_mjd, merged_flux, merged_err, delta)
+    t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta)
     
     Calibrated_mjd = []
     Calibrated_flux = []
@@ -2181,19 +2434,19 @@ def LensFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
 
 
 
-def FluxToMag(flux, flux_err):
-    mag = -2.5*np.log10(flux/(3.0128e7))
+def FluxToMag(flux, flux_err,flux_convert_factor):
+    mag = -2.5*np.log10(flux/(flux_convert_factor))
     mag_err=1.0857*flux_err/flux
     return mag, mag_err
 
 
-def MagToFlux(mag, mag_err):
-    flux =(3.0128e7)*10**(-0.4*mag)  
+def MagToFlux(mag, mag_err,flux_convert_factor):
+    flux =(flux_convert_factor)*10**(-0.4*mag)  
     flux_err = mag_err*flux/1.0857
     return flux, flux_err
 
 class GravLensFit():
-    def __init__(self, datadir, objName, images, priors, init_tau = None, init_delta=10.0, add_var=True, sig_level = 4.0, Nsamples=10000, Nburnin=5000):
+    def __init__(self, datadir, objName, images, priors, init_tau = None, init_delta=10.0, add_var=True, sig_level = 4.0, Nsamples=10000, Nburnin=5000, flux_convert_factor=3.0128e-5):
         self.datadir=datadir
         self.objName=objName
         self.images=images
@@ -2202,25 +2455,7 @@ class GravLensFit():
             file = datadir + str(self.objName) +"_"+ str(self.images[i]) + ".dat"
             data.append(np.loadtxt(file))
             
-        #Covert to flux
-       # print("Converting to Flux")
-        
-        data_L = []
-        for i in range(len(data)):
-            err=[]
-            mjd = data[i][:,0]
-            flux, flux_err = MagToFlux(np.array(data[i][:,1]), np.array(data[i][:,2]))
-            
-            
-            
-           # flux =(3.0128e-5)*10**(-0.4*data[i][:,1])
-           # for j in range(len(mjd)):
-                #mag_dist = np.random.normal(data[i][j,1], data[i][j,2], size=int(1e5))
-                #flux_dist = (3.0128e28)*10**(-0.4*mag_dist)/1e33
-                #err.append(np.std(flux_dist))
-                #err.append(data[i][j,2]*flux[j]/1.0857)
-            data_L.append(np.transpose([mjd, flux, flux_err])) 
-        
+
 
         
         self.priors= priors
@@ -2230,11 +2465,23 @@ class GravLensFit():
         self.sig_level = sig_level
         self.Nsamples = Nsamples
         self.Nburnin = Nburnin
+        self.flux_convert_factor=flux_convert_factor
         if (init_tau == None):
             self.init_tau = [0]*len(data)
         else:
             self.init_tau = init_tau
-
+            
+            
+        #Covert to flux
+       # print("Converting to Flux")
+        
+        data_L = []
+        for i in range(len(data)):
+            err=[]
+            mjd = data[i][:,0]
+            flux, flux_err = MagToFlux(np.array(data[i][:,1]), np.array(data[i][:,2]),self.flux_convert_factor)
+            data_L.append(np.transpose([mjd, flux, flux_err])) 
+        
         
         run = LensFit(data_L, self.priors, self.init_tau, self.init_delta, self.add_var, self.sig_level, self.Nsamples, self.Nburnin, self.images, self.datadir)
 
@@ -2251,15 +2498,7 @@ class GravLensFit():
         for i in range(len(data)):
             err=[]
             mjd = self.data_fluxes[i][:,0]
-            
-            mag, mag_err = FluxToMag(self.data_fluxes[i][:,1], self.data_fluxes[i][:,2])
-            
-           # mag = -2.5*np.log10(self.data_fluxes[i][:,1]/(3.0128e-5))
-            #for j in range(len(mjd)):
-                #flux_dist = np.random.normal(self.data_fluxes[i][j,1], self.data_fluxes[i][j,2], size=int(1e6)) 
-                #mag_dist = -2.5*np.log10(flux_dist/(3.0128e-5))
-               # err.append(np.std(mag_dist))
-              # err.append(1.0857*self.data_fluxes[i][j,2]/self.data_fluxes[i][j,1])
+            mag, mag_err = FluxToMag(self.data_fluxes[i][:,1], self.data_fluxes[i][:,2],self.flux_convert_factor)
             data_mag.append(np.transpose([mjd, mag, mag_err]))
             
                 
@@ -2302,49 +2541,7 @@ class GravLensFit():
         
         
         samples_chunks = [transpose_samples[i:i + chunk_size] for i in range(0, len(transpose_samples), chunk_size)]
-        
-        #Print delays
-       # print("")
-        #print("Inter-Image Time Delays:")
-      #  tau_dists=[]
-      #  N=len(data_mag)
-      #  for i in range(N):
-        #    tau_dists.append(samples_chunks[i][0])
-        #tau_dists = np.array(tau_dists)
-        
-       # tau_diffs = []
-       # max_diff = len(tau_dists) - 1
-      #  diff = 1
-     #   while diff <= max_diff:
-        #    for i in range(diff, len(tau_dists)):
-          #      tau_diffs.append(tau_dists[i]-tau_dists[i-diff])
-          #  diff += 1
 
-       # img_labels = []
-      #  max_diff = len(self.images) - 1
-     #   diff = 1
-     #   while diff <= max_diff:
-         #   for i in range(diff, len(self.images)):
-            #    img_labels.append(self.images[i-diff] + self.images[i])
-           # diff += 1
-
-
-
-       # for i in range(len(tau_diffs)):
-          #  print("\u03C4_" + img_labels[i]+" = "+str(np.percentile(-1.0*tau_diffs[i], [16, 50, 84])[1]) + " +"+str(np.percentile(-1.0*tau_diffs[i], [16, 50, 84])[2] - np.percentile(-1.0*tau_diffs[i], [16, 50, 84])[1]) +" -" + str(np.percentile(-1.0*tau_diffs[i], [16, 50, 84])[1] - np.percentile(-1.0*tau_diffs[i], [16, 50, 84])[0]))
-            
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
         A0 = np.percentile(samples_chunks[-1][0], [16, 50, 84])[1]   
         B0 = np.percentile(samples_chunks[-1][1], [16, 50, 84])[1] 
         band_colors=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
@@ -2387,10 +2584,22 @@ class GravLensFit():
                     z=int(2.0*j)
                     axs[z].errorbar(mjd, flux, yerr=flux_err, ls='none', marker=".", color=band_colors[j])
                     #Plot Model
-                    mag = -2.5*np.log10(m_scaled/3.0123e7)
-                    mag_up = -2.5*np.log10(m_scaled_up/3.0123e7)                    
-                    mag_down = -2.5*np.log10(m_scaled_down/3.0123e7)   
+                    mag = -2.5*np.log10(m_scaled/self.flux_convert_factor)
                     
+                    mag_up=np.empty(len(self.t))
+                    mag_down = np.empty(len(self.t))
+            
+                    for k in range(len(self.t)):
+                        if (m_scaled_up[k]/self.flux_convert_factor>0):
+                            mag_up[k] = -2.5*np.log10(m_scaled_up[k]/self.flux_convert_factor)     
+                        else:
+                            mag_up[k] = 1e5
+                                  
+                        if (m_scaled_down[k]/self.flux_convert_factor>0):                         
+                            mag_down[k] = -2.5*np.log10(m_scaled_down[k]/self.flux_convert_factor)
+                        else:
+                            mag_down[k]=1e5
+
                                                          
                     axs[z].plot(self.t , mag, color="black")
                     axs[z].fill_between(self.t, mag_up, mag_down,facecolor="darkgrey", edgecolor='none', rasterized=True, antialiased=True)
@@ -2404,7 +2613,7 @@ class GravLensFit():
                     length=abs(max(mjd)-min(mjd))        
                     axs[z].set_xlim(min(mjd)-0.1*length, max(mjd)+0.1*length)            
                 else:
-                    fluxes = (3.0128e7)*10**(-0.4*data_mag[j][:,1])
+                    fluxes = (self.flux_convert_factor)*10**(-0.4*data_mag[j][:,1])
                     t_shifted = self.t + tau
                     interp = interpolate.interp1d(t_shifted, self.X, kind="linear", fill_value="extrapolate")
                     mj = interp(mjd)
@@ -2423,11 +2632,12 @@ class GravLensFit():
                     axs[z].set_ylim(min(delta_m)-0.2*length, max(delta_m)+0.2*length)
                     axs[z].invert_yaxis()                  
         axs[0].set_title(self.objName)
+        fig.show()
         i = 0
         while os.path.exists('{}{:d}.pdf'.format("GravLensPlot", i)):
             i += 1
         fig.savefig('{}{:d}.pdf'.format("GravLensPlot", i))
-        plt.close();       
+        #plt.close()      
         
         
         
