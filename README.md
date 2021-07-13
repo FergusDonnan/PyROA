@@ -181,7 +181,7 @@ datadir : string :</strong> Directory of lightcurves in format "objName_image.da
 
 <strong> Nburnin : int :</strong> The number of Nsamples to be removed as burn-in. 
 
-<strong> flux_convert_factor : float :</strong> Factor used when converting magnitudes to fluxes, where flux = 3.0128e-5 10^(-0.4m).
+<strong> flux_convert_factor : float :</strong> Factor used when converting magnitudes to fluxes, where flux = flux_convert_factor * 10^(-0.4m).
 
 ## Citation
 
