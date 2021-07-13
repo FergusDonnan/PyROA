@@ -138,7 +138,6 @@ datadir : string :</strong> Directory of lightcurves in format "objName_filter_s
 
 
 
-
 ### Case 3: Measuring time delays between lensed quasar images
 To measure the time delay between lightcurves of lensed quasar images we use the function GravLensFit. This is ran in the same way as before where a directory is specified that contains .dat files of each of the lightcurves with three columns: time, mag, mag_err. Here the brightness is in magnitude and the function does the conversion where : flux = 3.0128e-5 10^(-0.4m). This converts into arbitrary flux units and so this factor can be changed depending on the data.
 Here we specify images rather than filters:
@@ -164,6 +163,25 @@ priors = [[A1_lower, A1_upper], [B1_lower, B1_upper], [tau_lower, tau_upper],[de
     
 datadir : string :</strong> Directory of lightcurves in format "objName_image.dat"
 
+<strong> objName : string :</strong> Name of object in order to find lightcurve .dat files 
+
+<strong> images : array :</strong> List of images.
+
+<strong> priors : array :</strong> Array specifying the limits of uniform priors for the parameters. Exact formatting is explained above.
+
+<strong> init_tau : array :</strong> List of initial time delays. This can help reduce burn-in or find correct solution if delays are very large and lightcurves have little overlap.
+
+<strong> init_delta : float :</strong> Initial values of delta.
+
+<strong> add_var : bool :</strong> Whether to include paramters that add extra variance to the flux errors for each lightcurve.
+
+<strong> sig_level : float :</strong> The threshold in units of sigma, for the sigma clipping.
+
+<strong> Nsamples : int :</strong> The number of MCMC samples, per walker, for the fitting procedure. This value includes the burn-in 
+
+<strong> Nburnin : int :</strong> The number of Nsamples to be removed as burn-in. 
+
+<strong> flux_convert_factor : float :</strong> Factor used when converting magnitudes to fluxes, where flux = 3.0128e-5 10^(-0.4m).
 
 ## Citation
 
