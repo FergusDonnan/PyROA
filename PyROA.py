@@ -106,76 +106,11 @@ def RunningOptimalAverage(t_data, Flux, Flux_err, delta):
 
 
 
-@jit(nopython=True, cache=True, parallel=True)
-def RunningOptimalAverage2(t_data, Flux, Flux_err, delta, factors):
-    #Inputs
-    # Flux : Array of data values
-    # Flux_err : Array containig errors of data values
-    # delta : parameter defining how "loose" memory function is
-    # t_data : Array of wavelength data values
-
-    
-    #Outputs
-    # t : List of model times 
-    # model : List of model fluxes calculated from running optimal average
-
-
-    gridsize=1000
-
-    
-    mx=max(t_data)
-    mn=min(t_data)
-    length = abs(mx-mn)
-    t = np.arange(mn, mx, length/(gridsize))
-    model = np.empty(gridsize)
-    errs = np.empty(gridsize)
-     
-    for j in prange(len(t)):
-
-        #Only include significant data points
-        t_data_use = t_data[np.where(np.absolute(t[j]-t_data) < 5.0*delta)[0]]
-        Flux_err_use = Flux_err[np.where(np.absolute(t[j]-t_data) < 5.0*delta)[0]]
-        Flux_use = Flux[np.where(np.absolute(t[j]-t_data) < 5.0*delta)[0]]
-        delta_use = delta[np.where(np.absolute(t[j]-t_data) < 5.0*delta)[0]]
-        factors_use = factors[np.where(np.absolute(t[j]-t_data) < 5.0*delta)[0]]
-        
-
-        if (len(np.where(np.absolute(t[j]-t_data) < 5.0*delta)[0])<1):
-            #Define Gaussian Memory Function
-            w = factors * np.exp(-0.5*(((t[j]-t_data)/delta)**2))/(Flux_err**2)
-        
-            #1/cosh Memory Function
-            #w = 1.0/((Flux_err_use**2)*np.cosh((t[j]-t_data_use)/delta))
-        
-            #Calculate optimal average
-            model[j] = np.nansum(Flux*w)/np.nansum(w)
-            #Calculate error
-            errs[j] = np.sqrt(1.0/np.nansum(w)) 
-
-
-        else:
-            #Define Gaussian Memory Function
-            w =factors_use * np.exp(-0.5*(((t[j]-t_data_use)/delta_use)**2))/(Flux_err_use**2)
-        
-            #1/cosh Memory Function
-            #w = 1.0/((Flux_err_use**2)*np.cosh((t[j]-t_data_use)/delta))
-        
-            #Calculate optimal average
-            model[j] = np.nansum(Flux_use*w)/np.nansum(w)
-            #Calculate error
-            errs[j] = np.sqrt(1.0/np.nansum(w))
-        
-
-
-
-    return t[0:int(gridsize)], model, errs
-
-
 
 
 
 @jit(nopython=True, cache=True, parallel=True)
-def RunningOptimalAverage3(t_data, Flux, Flux_err, delta, rmss):
+def RunningOptimalAverage2(t_data, Flux, Flux_err, delta, rmss):
     #Inputs
     # Flux : Array of data values
     # Flux_err : Array containig errors of data values
@@ -236,11 +171,87 @@ def RunningOptimalAverage3(t_data, Flux, Flux_err, delta, rmss):
     return mjd, model, errs
 
 
+@jit(nopython=True, cache=True, parallel=True)
+def RunningOptimalAverage3(t_data, Flux, Flux_err, delta, rmss):
+    #Inputs
+    # Flux : Array of data values
+    # Flux_err : Array containig errors of data values
+    # delta : parameter defining how "loose" memory function is
+    # t_data : Array of wavelength data values
+
+    
+    #Outputs
+    # t : List of model times 
+    # model : List of model fluxes calculated from running optimal average
+
+    mjd=t_data
+    model = np.empty(len(mjd))
+    errs = np.empty(len(mjd))
+    Ps = np.empty(len(mjd))
+    
+    for j in prange(len(mjd)):
+
+        #deltas_full = np.sqrt(delta**2 + rmss[j]**2)
+        factors_full = np.sqrt(delta**2 + rmss[j]**2)/np.sqrt(delta**2 + rmss[j]**2+ (rmss[j]-rmss)**2)
+        
+        #Calculate window functions from convolution
+        t = np.linspace(np.min(t_data), np.max(t_data), 200)
+        
+        w = np.exp(-0.5*(((mjd[j]-t)/delta)**2))
+        
+
+        if (rmss[j] ==0):
+            conv = np.interp(t_data, t, w)
+        else:      
+            psi = np.exp(-0.5*(((mjd[j]-t)/rmss[j])**2))
+            conv = np.convolve(psi, w)
+            conv = conv[int(conv.size/4):int(3*conv.size/4)]        
+            conv = np.interp(t_data, t, conv)
+        
+        
+
+        #Only include significant data points
+        factors_full_use = factors_full[np.where(np.absolute(mjd[j]-t_data) < 50.0*delta)[0]]
+        conv_use = conv[np.where(np.absolute(mjd[j]-t_data) < 50.0*delta)[0]]
+        Flux_err_use = Flux_err[np.where(np.absolute(mjd[j]-t_data) < 50.0*delta)[0]]
+        Flux_use = Flux[np.where(np.absolute(mjd[j]-t_data) < 50.0*delta)[0]]
+        if (np.where(np.absolute(mjd[j]-t_data) < 50.0*delta)[0].size<1):
+            #Define Gaussian Memory Function
+            w = factors_full  * conv/(Flux_err**2)
+        
+            #1/cosh Memory Function
+            #w = 1.0/((Flux_err_use**2)*np.cosh((t[j]-t_data_use)/delta))
+        
+        
+            w_sum = np.nansum(w)
+            #Calculate optimal average
+            model[j] = np.nansum(Flux*w)/w_sum
+            #Calculate error
+            errs[j] = np.sqrt(1.0/w_sum) 
+
+
+        else:
+            #Define Gaussian Memory Function
+            w =factors_full_use* conv_use/(Flux_err_use**2)
+        
+            #1/cosh Memory Function
+            #w = 1.0/((Flux_err_use**2)*np.cosh((t[j]-t_data_use)/delta))
+        
+            w_sum = np.nansum(w)
+            #Calculate optimal average
+            model[j] = np.nansum(Flux_use*w)/w_sum
+            #Calculate error
+            errs[j] = np.sqrt(1.0/w_sum)
+        
+        Ps[j] = 1.0/((Flux_err[j]**2)*w_sum)
+    P = np.nansum(Ps)
+    return mjd, model, errs, P
+
 
 
 
 @jit(nopython=True, cache=True, parallel=True)
-def RunningOptimalAverageOut3(mjd, t_data, Flux, Flux_err, delta_new, tau_rms, rmss):
+def RunningOptimalAverageOut2(mjd, t_data, Flux, Flux_err, delta_new, tau_rms, rmss):
     #Inputs
     # Flux : Array of data values
     # Flux_err : Array containig errors of data values
@@ -255,6 +266,7 @@ def RunningOptimalAverageOut3(mjd, t_data, Flux, Flux_err, delta_new, tau_rms, r
 
     deltas_full = delta_new
     factors_full = np.sqrt(delta_new**2)/np.sqrt(delta_new**2 + (tau_rms - rmss)**2)
+
     model = np.empty(len(mjd))
     errs = np.empty(len(mjd))
      
@@ -292,9 +304,79 @@ def RunningOptimalAverageOut3(mjd, t_data, Flux, Flux_err, delta_new, tau_rms, r
             model[j] = np.nansum(Flux_use*w)/np.nansum(w)
             #Calculate error
             errs[j] = np.sqrt(1.0/np.nansum(w))
+
+    return mjd, model, errs
+
+
+
+@jit(nopython=True, cache=True, parallel=True)
+def RunningOptimalAverageOut3(mjd, t_data, Flux, Flux_err, delta, tau_rms, rmss, ws):
+    #Inputs
+    # Flux : Array of data values
+    # Flux_err : Array containig errors of data values
+    # delta : parameter defining how "loose" memory function is
+    # t_data : Array of wavelength data values
+
+    
+    #Outputs
+    # t : List of model times 
+    # model : List of model fluxes calculated from running optimal average
+
+
+
+    factors_full = np.sqrt(delta**2 + tau_rms**2)/np.sqrt(delta**2 + tau_rms**2 + (tau_rms - rmss)**2)
+
+    model = np.empty(len(mjd))
+    errs = np.empty(len(mjd))
+     
+    for j in prange(len(mjd)):
+    
+    
+        #Calculate window functions from convolution
+        t = np.linspace(min(t_data), max(t_data), 200)
+        
+        w = np.exp(-0.5*(((mjd[j]-t)/delta)**2))
         
 
 
+        if (tau_rms ==0):
+            conv = np.interp(t_data, t, w)
+        else:      
+            psi = np.exp(-0.5*(((mjd[j]-t)/tau_rms)**2))
+            conv = np.convolve(psi, w)
+            conv = conv[int(len(conv)/4):int(3*len(conv)/4)]                    
+            conv = np.interp(t_data, t, conv)
+            
+        #Only include significant data points
+        factors_full_use = factors_full[np.where(np.absolute(mjd[j]-t_data) < 50.0*delta)[0]]
+        conv_use = conv[np.where(np.absolute(mjd[j]-t_data) < 50.0*delta)[0]]  
+        Flux_err_use = Flux_err[np.where(np.absolute(mjd[j]-t_data) < 50.0*delta)[0]]
+        Flux_use = Flux[np.where(np.absolute(mjd[j]-t_data) < 50.0*delta)[0]]    
+    
+        if (len(np.where(np.absolute(mjd[j]-t_data) < 50.0*delta)[0])<1):
+            #Define Gaussian Memory Function
+            w = factors_full  * conv/(Flux_err**2)
+        
+            #1/cosh Memory Function
+            #w = 1.0/((Flux_err_use**2)*np.cosh((t[j]-t_data_use)/delta))
+        
+            #Calculate optimal average
+            model[j] = np.nansum(Flux*w)/np.nansum(w)
+            #Calculate error
+            errs[j] = np.sqrt(1.0/np.nansum(w)) 
+
+
+        else:
+            #Define Gaussian Memory Function
+            w =factors_full_use* conv_use/(Flux_err_use**2)
+        
+            #1/cosh Memory Function
+            #w = 1.0/((Flux_err_use**2)*np.cosh((t[j]-t_data_use)/delta))
+        
+            #Calculate optimal average
+            model[j] = np.nansum(Flux_use*w)/np.nansum(w)
+            #Calculate error
+            errs[j] = np.sqrt(1.0/np.nansum(w))
 
     return mjd, model, errs
 
@@ -345,53 +427,18 @@ def CalculateP(t_data, Flux, Flux_err, delta):
 
     return np.nansum(Ps)
     
-    
-@jit(nopython=True, cache=True, parallel=True)
-def CalculateP2(t_data, Flux, Flux_err, delta, factors):
 
-    Ps = np.empty(len(t_data))
-    for i in prange(len(t_data)):
-    
-    
-        #Only include significant data points
-        t_data_use = t_data[np.where(np.absolute(t_data[i]-t_data) < 5.0*delta)[0]]
-        Flux_err_use = Flux_err[np.where(np.absolute(t_data[i]-t_data) < 5.0*delta)[0]]
-        delta_use = delta[np.where(np.absolute(t_data[i]-t_data) < 5.0*delta)[0]]
-        factors_use = factors[np.where(np.absolute(t_data[i]-t_data) < 5.0*delta)[0]]
-                
-        if (len(np.where(np.absolute(t_data[i]-t_data) < 5.0*delta)[0])==0):
-            #Define Gaussian Memory Function
-            w =factors * np.exp(-0.5*(((t_data[i]-t_data)/delta)**2))/(Flux_err**2)
-
-            #1/cosh Memory function
-            #w = 1.0/((Flux_err_use**2)*np.cosh((t_data[i]-t_data_use)/delta))
-
-
-        else:
-        
-            #Define Gaussian Memory Function
-            w =factors_use * np.exp(-0.5*(((t_data[i]-t_data_use)/delta_use)**2))/(Flux_err_use**2)
-
-            #1/cosh Memory function
-            #w = 1.0/((Flux_err_use**2)*np.cosh((t_data[i]-t_data_use)/delta))
-
-
-
-        #P= P + 1.0/((Flux_err[i]**2)*np.nansum(w))
-        Ps[i] = 1.0/((Flux_err[i]**2)*np.nansum(w))
-
-    return np.nansum(Ps)
     
     
 @jit(nopython=True, cache=True, parallel=True)
-def CalculateP3(t_data, Flux, Flux_err, delta, rmss):
+def CalculateP2(t_data, Flux, Flux_err, delta, rmss):
 
     Ps = np.empty(len(t_data))
     for i in prange(len(t_data)):
     
         deltas_full = np.sqrt(delta**2 + rmss[i]**2)
         factors_full = np.sqrt(delta**2 + rmss[i]**2)/np.sqrt(delta**2 + rmss[i]**2+ (rmss[i]-rmss)**2)
-    
+
         #Only include significant data points
         t_data_use = t_data[np.where(np.absolute(t_data[i]-t_data) < 5.0*deltas_full)[0]]
         Flux_err_use = Flux_err[np.where(np.absolute(t_data[i]-t_data) < 5.0*deltas_full)[0]]
@@ -421,7 +468,45 @@ def CalculateP3(t_data, Flux, Flux_err, delta, rmss):
 
     return np.nansum(Ps)
     
+@jit(nopython=True, cache=True, parallel=True)
+def CalculateP3(t_data, Flux, Flux_err, delta, rmss, ws):
 
+    Ps = np.empty(len(t_data))
+    for i in prange(len(t_data)):
+    
+        deltas_full = np.sqrt(delta**2 + rmss[i]**2)
+        factors_full = np.sqrt(delta**2 + rmss[i]**2)/np.sqrt(delta**2 + rmss[i]**2+ (rmss[i]-rmss)**2)
+
+        #Only include significant data points
+        t_data_use = t_data[np.where(np.absolute(t_data[i]-t_data) < 5.0*deltas_full)[0]]
+        Flux_err_use = Flux_err[np.where(np.absolute(t_data[i]-t_data) < 5.0*deltas_full)[0]]
+        #deltas_full_use = deltas_full[np.where(np.absolute(t_data[i]-t_data) < 5.0*deltas_full)[0]]
+        factors_full_use = factors_full[np.where(np.absolute(t_data[i]-t_data) < 5.0*deltas_full)[0]]
+        ws_use = ws[i, :][np.where(np.absolute(t_data[i]-t_data) < 5.0*deltas_full)[0]]
+                
+                
+        if (len(np.where(np.absolute(t_data[i]-t_data) < 5.0*deltas_full)[0])==0):
+            #Define Gaussian Memory Function
+            w =factors_full* ws[i, :]/(Flux_err**2)
+
+            #1/cosh Memory function
+            #w = 1.0/((Flux_err_use**2)*np.cosh((t_data[i]-t_data_use)/delta))
+
+
+        else:
+        
+            #Define Gaussian Memory Function
+            w =factors_full_use * ws_use/(Flux_err_use**2)
+
+            #1/cosh Memory function
+            #w = 1.0/((Flux_err_use**2)*np.cosh((t_data[i]-t_data_use)/delta))
+
+
+
+        #P= P + 1.0/((Flux_err[i]**2)*np.nansum(w))
+        Ps[i] = 1.0/((Flux_err[i]**2)*np.nansum(w))
+
+    return np.nansum(Ps)
 
 
 @jit(nopython=True, cache=True, parallel=True)
@@ -503,81 +588,10 @@ def RunningOptimalAverageOutp(t_data, Flux, Flux_err, delta):
 
     return t[0:int(gridsize)], model, errs    
     
-@jit(nopython=True, cache=True, parallel=True)
-def RunningOptimalAverageOutp2(t_data, Flux, Flux_err, delta, factors):
-    #Inputs
-    # Flux : Array of data values
-    # Flux_err : Array containig errors of data values
-    # delta : parameter defining how "loose" memory function is
-    # t_data : Array of wavelength data values
-
-    
-    #Outputs
-    # t : List of model times 
-    # model : List of model fluxes calculated from running optimal average
-
-
-    gridsize=1000
-
-    
-    mx=max(t_data)
-    mn=min(t_data)
-    length = abs(mx-mn)
-    step = length/(gridsize)
-    low=mn - 0.2*length
-    high=mx + 0.2*length
-    t = np.arange(low, high, step)
-    gridsize=len(t)
-    
-    model = np.empty(gridsize)
-    errs = np.empty(gridsize)
-     
-    for j in prange(len(t)):
-
-        #Only include significant data points
-        t_data_use = t_data[np.where(np.absolute(t[j]-t_data) < 5.0*delta)[0]]
-        Flux_err_use = Flux_err[np.where(np.absolute(t[j]-t_data) < 5.0*delta)[0]]
-        Flux_use = Flux[np.where(np.absolute(t[j]-t_data) < 5.0*delta)[0]]
-        delta_use = delta[np.where(np.absolute(t[j]-t_data) < 5.0*delta)[0]]       
-        factors_use = factors[np.where(np.absolute(t[j]-t_data) < 5.0*delta)[0]]        
-
-        if (len(np.where(np.absolute(t[j]-t_data) < 5.0*delta)[0])<1):
-            #Define Gaussian Memory Function
-            w = factors * np.exp(-0.5*(((t[j]-t_data)/delta)**2))/(Flux_err**2)
-        
-            #1/cosh Memory Function
-            #w = 1.0/((Flux_err_use**2)*np.cosh((t[j]-t_data_use)/delta))
-        
-            #Calculate optimal average
-            model[j] = np.nansum(Flux*w)/np.nansum(w)
-            #Calculate error
-            errs[j] = np.sqrt(1.0/np.nansum(w)) 
-
-
-        else:
-            #Define Gaussian Memory Function
-            w = factors_use * np.exp(-0.5*(((t[j]-t_data_use)/delta_use)**2))/(Flux_err_use**2)
-        
-            #1/cosh Memory Function
-            #w = 1.0/((Flux_err_use**2)*np.cosh((t[j]-t_data_use)/delta))
-        
-            #Calculate optimal average
-            model[j] = np.nansum(Flux_use*w)/np.nansum(w)
-            #Calculate error
-            errs[j] = np.sqrt(1.0/np.nansum(w))
-        
-
-
-
-    return t[0:int(gridsize)], model, errs    
-    
-    
-    
-    
-    
 
     
     
+
     
     
     
@@ -632,7 +646,10 @@ def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delt
             V =  params_chunks[i][-1]
             
         if (delay_dist == True):
-            tau_rms = params_chunks[i][3]
+            if (i>0):
+                tau_rms = params_chunks[i][3]
+            else:
+                tau_rms=0.0
 
 
             
@@ -674,6 +691,7 @@ def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delt
             merged_err[int(j+ prev)] = err[j]
             if (delay_dist == True):
                 rmss[int(j+ prev)] = tau_rms
+
                # factors[int(j+ prev)] = delta/np.sqrt(delta**2 + (tau_rms)**2)#/delta
      
         prev = int(prev + len(mjd))
@@ -701,14 +719,12 @@ def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delt
          
     #Calculate no. of paramters for delay_dist==True here, actual ROA calcualted in loop per lightcurve   
     else:
-        t,m,errs = RunningOptimalAverage3(merged_mjd, merged_flux, merged_err, delta, rmss)
-        P = CalculateP3(merged_mjd, merged_flux, merged_err, delta, rmss)
+
+        t,m,errs = RunningOptimalAverage2(merged_mjd, merged_flux, merged_err, delta, rmss) 
+        P = CalculateP2(merged_mjd, merged_flux, merged_err, delta, rmss)
+        #t,m,errs,P = RunningOptimalAverage3(merged_mjd, merged_flux, merged_err, delta, rmss)
         #Normalise lightcurve
 
-        m_mean = np.mean(m)#np.average(m, weights = 1.0/(errs**2))
-        m_rms = np.std(m)
-        m = (m-m_mean)/m_rms
-        errs = errs/m_rms
 
 
     #Calculate chi-squared for each lightcurve and sum
@@ -754,11 +770,21 @@ def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delt
             
         #Calculate ROA at mjd of each lightcurve using different delta
         else:
-            tau_rms = params_chunks[i][3]
-            delta_new = np.sqrt(delta**2 + (tau_rms)**2)
-            factor = delta/np.sqrt(delta**2 + (tau_rms)**2)
+            if (i>0):
+                tau_rms =params_chunks[i][3]
+            else:
+                tau_rms=0.0
+           # delta_new = np.sqrt(delta**2 + (tau_rms)**2)
+          #  factor = delta/np.sqrt(delta**2 + (tau_rms)**2)
             
             
+            
+            
+            m_mean = np.mean(m[prev : int(prev + len(mjd))])
+            m_rms = np.std(m[prev : int(prev + len(mjd))])
+            m[prev : int(prev + len(mjd))] = (m[prev : int(prev + len(mjd))]-m_mean)/m_rms
+            errs[prev : int(prev + len(mjd))] = errs[prev : int(prev + len(mjd))]/m_rms  
+             
             Xs = m[prev : int(prev + len(mjd))]
             errs = errs[prev : int(prev + len(mjd))]
             
@@ -843,7 +869,7 @@ def log_prior(params, priors, add_var, data, delay_dist):
         V_prior = priors[4]
     
     if (delay_dist == True):
-        tau_rms_prior = priors[5]
+        ln_tau_rms_prior = priors[5]
 
     
     check=[]
@@ -859,9 +885,9 @@ def log_prior(params, priors, add_var, data, delay_dist):
             
             
         if (delay_dist == True):
-            tau_rms = params_chunks[i][3]
+            ln_tau_rms = params_chunks[i][3]
 
-            if tau_rms_prior[0] <= tau_rms <= tau_rms_prior[1]:
+            if ln_tau_rms_prior[0] <= ln_tau_rms <= ln_tau_rms_prior[1]:
                 check.append(0.0)
             else:
                 check.append(1.0)
@@ -984,7 +1010,7 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
             
         if (delay_dist == True):
             pos_chunks[i][3] = 1.0
-            labels_chunks[i][3]="\u03C4_rms"+str(i)
+            labels_chunks[i][3]="\u0394"+str(i)
                        
         labels_chunks[i][0] = "A"+str(i)
         labels_chunks[i][1] = "B"+str(i)        
@@ -1101,14 +1127,20 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
         if (add_var == True):
             V =  np.percentile(samples_chunks[i][-1], [16, 50, 84])[1]
         if (delay_dist == True):
-            tau_rms = np.percentile(samples_chunks[i][3], [16, 50, 84])[1]
+            if (i>0):
+                tau_rms = np.percentile(samples_chunks[i][3], [16, 50, 84])[1]
+            else:
+                tau_rms=0.0
             
             
 
         params.append([A, B, tau])    
         
         if (delay_dist == True):
-            params.append([tau_rms])
+            if (i>0):
+                params.append([tau_rms])
+            else:
+                params.append([0.0])            
                     
             
         #Add extra variance
@@ -1172,11 +1204,14 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
         errs = errs/m_rms
         
     else:
-        t,m,errs = RunningOptimalAverage3(merged_mjd, merged_flux, merged_err, delta, rmss)
+       # ws = CalcWind(merged_mjd, delta, rmss)
+        t,m_all,errs_all = RunningOptimalAverage2(merged_mjd, merged_flux, merged_err, delta, rmss)     
+       
+        #t,m_all,errs_all = RunningOptimalAverage3(merged_mjd, merged_flux, merged_err, delta, rmss, ws)
         #Calculate Norm. conditions 
 
-        m_mean = np.mean(m)
-        m_rms = np.std(m)
+       # m_mean = np.mean(m)
+       # m_rms = np.std(m)
        # m = (m-m_mean)/m_rms
         #errs = errs/m_rms
 
@@ -1184,6 +1219,7 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
         
     #Output model for specific lightcurves    
     models=[]
+    prev=0
     for i in range(len(data)):
         mjd = data[i][:,0]
         flux = data[i][:,1]
@@ -1218,7 +1254,10 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
             
             
         else:
-            tau_rms = np.percentile(samples_chunks[i][3], [16, 50, 84])[1]
+            if (i>0):
+                tau_rms = np.percentile(samples_chunks[i][3], [16, 50, 84])[1]
+            else:
+                tau_rms=0.0
             delta_new = np.sqrt(delta**2 + (tau_rms)**2)
 
             
@@ -1226,7 +1265,15 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
             mn=min(merged_mjd)
             length = abs(mx-mn)
             t = np.arange(mn, mx, length/(1000)) 
-            ts, Xs, errss = RunningOptimalAverageOut3(t, merged_mjd, merged_flux, merged_err, delta_new, tau_rms, rmss)
+
+            
+            ts, Xs, errss = RunningOptimalAverageOut2(t, merged_mjd, merged_flux, merged_err, delta_new, tau_rms, rmss)
+            
+            
+            
+            m_mean = np.mean(m_all[prev : int(prev + len(mjd))])
+            m_rms = np.std(m_all[prev : int(prev + len(mjd))])
+
 
             Xs = (Xs-m_mean)/m_rms
             errss = errss/m_rms
@@ -1242,7 +1289,9 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
             models.append([t+tau, model, model_errs])         
             t,m,errs = models[0]
                        
-
+        prev = int(prev + len(mjd))
+        
+        
     print("Best Fit Parameters")
     table = [params]
     print(tabulate(table, headers=labels))
@@ -1375,7 +1424,7 @@ def Plot(Fit):
         data[i][:,1] = data[i][:,1]
         data[i][:,2] = data[i][:,2]
 
-    cmap = matplotlib.cm.get_cmap('nipy_spectral')
+    cmap = matplotlib.cm.get_cmap('tab10')
     band_colors=[]
     n = np.arange(0.05, 1.0 + 0.5/len(filters), 1.0/len(filters))
     for i in range(len(filters)):
@@ -1409,13 +1458,15 @@ def Plot(Fit):
         
     fig = plt.figure(100)
     gs = fig.add_gridspec(len(filters), 2, hspace=0, wspace=0, width_ratios=[5, 1])
-    axs= gs.subplots(sharex='col')     
+    axs= gs.subplots(sharex='col') 
+    tss=[]    
     for j in range(len(filters)):
 
         #Read in parameter values
         A = np.percentile(samples_chunks[j][0], [16, 50, 84])[1]
         B = np.percentile(samples_chunks[j][1], [16, 50, 84])[1]
-        tau = np.percentile(samples_chunks[j][2], [16, 50, 84])[1]        
+        tau = np.percentile(samples_chunks[j][2], [16, 50, 84])       
+        tss.append(tau[1])
         tau_samples=samples_chunks[j][2]
         
         mjd = data[j][:,0]
@@ -1439,18 +1490,60 @@ def Plot(Fit):
         axs[j][0].set_ylim(min(flux)-0.2*length, max(flux)+0.2*length)
         axs[j][0].set_xlabel("MJD")
         
-        axs[j][0].annotate(filters[j], xy=(0.85, 0.85), xycoords='axes fraction', size=15.0, color=band_colors[j], fontsize=20)         
+        axs[j][0].annotate(filters[j], xy=(0.85, 0.85), xycoords='axes fraction', size=15.0, color=band_colors[j], fontsize=20) 
+        
+        frq, edges = np.histogram(tau_samples, bins=50)        
+        if (Fit.delay_dist==True):
+            tau_rms = np.percentile(samples_chunks[j][3], [16, 50, 84])
+            norm = 1.0 / ((tau_rms[1]) * np.sqrt(2.0 * np.pi))
+            norm = norm/max(frq)
+        else:
+            norm=1.0/max(frq)
         
         
         
-        axs[j][1].hist(tau_samples, color=band_colors[j], bins=50)
+                
+        
+
+        axs[j][1].bar(edges[:-1], frq*norm, width=np.diff(edges), edgecolor=band_colors[j], align="edge", color=band_colors[j])  
+        #axs[j][1].hist(tau_samples, color=band_colors[j], bins=50, density=True)
         axs[j][1].axvline(x = np.percentile(tau_samples, [16, 50, 84])[1], color="black")
         axs[j][1].axvline(x = np.percentile(tau_samples, [16, 50, 84])[0] , color="black", ls="--")
         axs[j][1].axvline(x = np.percentile(tau_samples, [16, 50, 84])[2], color="black",ls="--")
         axs[j][1].axvline(x = 0, color="black",ls="--")    
         axs[j][1].set_xlabel("Time Delay (Days)")
 
-  
+        if (Fit.delay_dist==True):
+            if (j>0):
+
+                tau_rms = np.percentile(samples_chunks[j][3], [16, 50, 84])
+            
+                length=10.0*tau_rms[1]
+                taus=np.arange(tau[1] - 5.0*tau_rms[1], tau[1] + 5.0*tau_rms[1], length/500)
+                G=models.Gaussian1D(amplitude=1 / ((tau_rms[1]) * np.sqrt(2 * np.pi)), mean=tau[1], stddev=tau_rms[1])
+                axs[j][1].plot( taus, G(taus), color="black", lw=1.5)
+            
+                #Limits for errors
+                up=[]
+                low=[]
+                for k in range(len(taus)):
+                    rms_samples = samples_chunks[j][3]
+                    mean_samples = samples_chunks[j][2]
+                    G=1.0/((rms_samples) * np.sqrt(2 * np.pi)) *np.exp(-0.5*((taus[k] - mean_samples)/rms_samples)**2)
+                    percent =  np.percentile(G, [16, 84])
+                    up.append(percent[0])
+                    low.append(percent[1])
+                
+                axs[j][1].fill_between(taus, up, low, color="black", alpha=0.5, edgecolor='none', rasterized=True, antialiased=True)
+    length = max(tss)-min(tss)        
+    axs[-1][1].set_xlim(min(tss)-0.5*length, max(tss)+0.5*length)
+            
+            
+            
+            
+            
+            
+            
         
     for ax in axs.flat:
         ax.label_outer()    
