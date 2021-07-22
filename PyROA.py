@@ -21,7 +21,8 @@ import scipy.special
 import matplotlib
 from astropy.modeling import models
 from scipy import signal
-from scipy.ndimage import gaussian_filter1d
+import matplotlib.gridspec as gridspec
+
 
 
 
