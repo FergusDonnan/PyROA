@@ -16,6 +16,8 @@ The code is easy to use with example jupyter notebooks provided, demonstrating e
 
 ## Installation
 
+To install download the PyROA.py file and import into your code using import PyROA where the PyROA.py file is in the same directory as your code.
+This will be pip installable within the coming days.
 
 
 
