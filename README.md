@@ -1,7 +1,7 @@
 # PyROA
 
 ## Overview
-PyROA is a tool for modelling quasar lightcurves where the variability is described using a running optimal average (ROA), and paramters are sampled using Markov Chain Monte Carlo (MCMC) techniques - specifically using emcee. Using a Bayesian approach, priors can be used on the sampled parameters.
+PyROA is a tool for modelling quasar lightcurves ([Donnan et al. 2021](https://ui.adsabs.harvard.edu/abs/2021arXiv210712318D/abstract)) where the variability is described using a running optimal average (ROA), and paramters are sampled using Markov Chain Monte Carlo (MCMC) techniques - specifically using emcee. Using a Bayesian approach, priors can be used on the sampled parameters.
 Currently it has three main uses:
 
 1. Determining the time delay between lightcurves at different wavelengths. 
@@ -187,4 +187,21 @@ datadir : string :</strong> Directory of lightcurves in format "objName_image.da
 
 ## Citation
 
+If you use this code please cite ([Donnan et al. 2021](https://ui.adsabs.harvard.edu/abs/2021arXiv210712318D/abstract)):
+
+@ARTICLE{2021arXiv210712318D, \
+       author = {{Donnan}, Fergus R. and {Horne}, Keith and {Hern{\'a}ndez Santisteban}, Juan V.}, \
+        title = "{Bayesian Analysis of Quasar Lightcurves with a Running Optimal Average: New Time Delay Measurements of COSMOGRAIL Gravitationally Lensed Quasars}", \
+      journal = {arXiv e-prints}, \
+     keywords = {Astrophysics - Instrumentation and Methods for Astrophysics, Astrophysics - Astrophysics of Galaxies}, \
+         year = 2021, \
+        month = jul, \
+          eid = {arXiv:2107.12318}, \
+        pages = {arXiv:2107.12318}, \
+archivePrefix = {arXiv}, \
+       eprint = {2107.12318}, \
+ primaryClass = {astro-ph.IM}, \
+       adsurl = {https://ui.adsabs.harvard.edu/abs/2021arXiv210712318D}, \
+      adsnote = {Provided by the SAO/NASA Astrophysics Data System} \
+} \
 
