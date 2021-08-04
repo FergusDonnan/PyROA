@@ -78,7 +78,7 @@ datadir : string :</strong> Directory of lightcurves in format "objName_filter.d
 
 <strong> init_delta : float :</strong> Initial values of delta.
 
-<strong> delay_dist : bool :</strong> Whether to include a delay distribution for each time delay that blurs the lightcurve according to the width of the delay distribution. If set to True, each delay parameter now represents the mean of a Gaussian delay distribtuion and a new parameter, tau_rms, represents the width.
+<strong> delay_dist : bool :</strong> Whether to include a delay distribution for each time delay that blurs the lightcurve according to the width of the delay distribution. If set to True, each delay parameter now represents the peak of a truncated Gaussian delay distribtuion and a new parameter, tau_rms, represents the width. This is blurring measured relative to the first lightcurve, where the trucation point of the distribtuion is the delay of this lightcurve, preventing delays less than this band contributing to the delay distribution. This option does take longer to run, especially on larger data sets.
 
 <strong> add_var : bool :</strong> Whether to include paramters that add extra variance to the flux errors for each lightcurve. 
 
@@ -94,7 +94,7 @@ datadir : string :</strong> Directory of lightcurves in format "objName_filter.d
 
 <strong> calc_P : bool :</strong> Option to pre-calculate the number of parameters for the ROA as a function of delta, which is subsequently interpolated for use in the fitting routine. This option can increase run-time significantly for large data sets. WARNING: This is approximate as it does not account for the current time delay or extra variance parameters. Would recomend only using if delays are small and add_var = False.
 
-
+<strong> delay_ref : string :</strong> Name of the filter, matching the filters array, that the delays will be measured relative to. This is default set to the first filter provided.
 
 
 ### Case 2: Intercalibrating lightcurves from multiple telescopes
