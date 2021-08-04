@@ -19,9 +19,18 @@ The code is easy to use with example jupyter notebooks provided, demonstrating e
 Install using pip: pip install PyROA
 
 
+## Changes
 
+#### v2.0.0
 
+- Added option to Fit() to specify which filter is the reference to measure delays relative to. Specify the name of the filter to the parameter delay_ref.
 
+- Changed the delay distribution to a truncated Gaussian which prevents delays less than the delay of the blurring reference lightcurve contributing to the delay distribution. 
+
+- If including a slow component, the code should now run at the same speed as when not including the component.
+
+#### v1.0.3
+Initial release of PyROA
 
 ## Usage
 ### Case 1: Measuring delays between lightcurves of different wavelengths
