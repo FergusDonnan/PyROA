@@ -21,6 +21,9 @@ Install using pip: pip install PyROA
 
 ## Changes
 
+#### v2.0.1
+- Fixed bug in driving lightcurve output when using the delay distributions.
+
 #### v2.0.0
 
 - Added option to Fit() to specify which filter is the reference to measure delays relative to. Specify the name of the filter to the parameter delay_ref.
