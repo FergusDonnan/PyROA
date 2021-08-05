@@ -1144,7 +1144,9 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
         
             model_errs = errss*A
             models.append([t+tau, model, model_errs])         
-            t,m,errs = models[0]
+            
+            if (i ==0):         
+                t,m,errs = [t+tau, Xs,errss]
                        
         prev = int(prev + len(mjd))
         
@@ -1158,17 +1160,15 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
     pickle.dump(samples_flat,filehandler)
     filehandler = open(b"samples.obj","wb")
     pickle.dump(samples,filehandler)
-    if (delay_dist == False):
-        filehandler = open(b"X_t.obj","wb")
-        pickle.dump([t, m, errs],filehandler)
+
+    filehandler = open(b"X_t.obj","wb")
+    pickle.dump([t, m, errs],filehandler)
     if (include_slow_comp==True):      
         filehandler = open(b"Slow_Comps.obj","wb")
         pickle.dump(slow_comps_out,filehandler)
         
     filehandler = open(b"Lightcurve_models.obj","wb")
     pickle.dump(models,filehandler)
-    
-        
     
     
     #Plot Corner Plot
