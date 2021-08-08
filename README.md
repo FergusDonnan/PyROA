@@ -21,6 +21,9 @@ Install using pip: pip install PyROA
 
 ## Changes
 
+#### v2.0.2
+- Fixed bug in calculating the slow component.
+
 #### v2.0.1
 - Fixed bug in driving lightcurve output when using the delay distributions.
 
