@@ -872,7 +872,7 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
     slow_comps =[]                    
     if (include_slow_comp==True):
         for i in range(len(data)):
-            t_sl, m_sl, errs_sl = RunningOptimalAverage(mjd,flux,err, slow_comp_delta)
+            t_sl, m_sl, errs_sl = RunningOptimalAverage(data[i][:,0], data[i][:,1], data[i][:,2], slow_comp_delta)
             m_sl = m_sl - np.mean(m_sl)            
             slow_comps.append([t_sl, m_sl, errs_sl])
             P_slow[i] = CalculateP(data[i][:,0], data[i][:,1], data[i][:,2], slow_comp_delta)
