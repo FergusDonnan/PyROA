@@ -21,6 +21,137 @@ import scipy.special
 import matplotlib
 from astropy.modeling import models
 from scipy import signal
+from scipy.ndimage import gaussian_filter1d
+from scipy.integrate import quad
+
+
+
+#Response Functions
+##########################################
+# Response functions defined such that they are shifted back to a mean of zero before being convolved with window function
+# Therefore in the case of asymetric response functions, mean is required to define shape but resulting psi is shifted to mean of zero before convolution. Use conv = True before convolution.
+
+#Simple Transfer Functions
+
+def Gaussian(mean, sig, t, conv):
+    if (conv==True):
+        mean = 0.0
+    return np.exp(-0.5*((t-mean)/sig)**2)
+
+def Uniform(mean, sig, t, conv):
+    if (conv==True):
+        mean = 0.0
+    a = mean-sig**2
+    b = mean+sig**2        
+    try:
+        psi = np.zeros(len(t))
+        mask = (a <= t) & (t <= b)
+        psi[mask] = 1.0
+    except:
+        psi = np.zeros(len(a))
+        mask = (a <= t) & (t <= b)
+        psi[mask] = 1.0
+    return psi
+
+
+#Enforce Causality not allowing delays less than blurring reference 
+
+def TruncGaussian(mean, sig, t, min_delay, conv): # Mean here becomes the peak. Need to convert to actual mean when outputting
+    if (conv==True):
+        mean = 0.0
+        min_delay = min_delay - mean
+    psi = np.exp(-0.5*((t-mean)/sig)**2)
+    psi[t<min_delay] = 0.0
+    return psi
+    
+def LogGaussian(mean, sig, t, min_delay, conv):
+    mean = mean - min_delay # set zero point to min delay    
+    mu = np.log(mean**2/np.sqrt(mean**2 + sig**2))
+    stddev2 = np.log( 1.0+ (sig**2)/(mean**2))
+
+    if (conv == True):
+        t = t + mean # Shift time grid to centre on mean
+        psi = np.zeros(len(t))
+        ts = t[t>0]
+        psi[t>0] = (1.0/(ts*np.sqrt(stddev2 *2.0*np.pi)))*np.exp(- 0.5 * (np.log(ts) - mu) ** 2 / stddev2)
+    else:
+        try:
+            t_shift = t - min_delay   
+            psi = np.zeros(len(t_shift))
+            ts = t_shift[t_shift>0]
+            psi[t_shift>0] = (1.0/(ts*np.sqrt(stddev2 *2.0*np.pi)))*np.exp(- 0.5 * (np.log(ts) - mu) ** 2 / stddev2)
+        except:
+            psi = np.zeros(len(mu))        
+            for i in range(len(min_delay)):
+                t_shift = t - min_delay[i]
+                if (t_shift > 0):
+                    psi[i] = (1.0/(t_shift*np.sqrt(stddev2[i] *2.0*np.pi)))*np.exp(- 0.5 * (np.log(t_shift) - mu[i]) ** 2 / stddev2[i])
+                else:
+                    psi[i]=0.0
+    return psi
+    
+def InverseGaussian(mean, sig, t, min_delay, conv):
+    mean = mean - min_delay # set zero point to min delay    
+    lam = (mean**3)/(sig**2)
+    if (conv==True):
+        t = t + mean # Shift time grid to centre on mean
+        psi=np.zeros(len(t))
+        ts = t[t>0]
+        psi[t>0] = np.sqrt(lam/(2.0*np.pi*ts**3))*np.exp(-lam*((ts-mean)**2)/(2.0*ts*mean**2))
+    else:
+        try:
+            t_shift = t - min_delay   
+            psi = np.zeros(len(t_shift))
+            ts = t_shift[t_shift>0]
+            psi[t_shift>0] = np.sqrt(lam/(2.0*np.pi*ts**3))*np.exp(-lam*((ts-mean)**2)/(2.0*ts*mean**2))
+        except:
+            psi = np.zeros(len(mu))        
+            for i in range(len(min_delay)):
+                t_shift = t - min_delay[i]
+                if (t_shift > 0):
+                    psi[i] = np.sqrt(lam[i]/(2.0*np.pi*t_shift**3))*np.exp(-lam[i]*((t_shift-mean[i])**2)/(2.0*t_shift*mean[i]**2))
+                else:
+                    psi[i]=0.0
+    return psi
+    
+
+# Accretion disc
+
+def AccDisc(l_0, l, T1, b,integral,t, min_delay, conv):
+
+    tau_0 = (l_0*1e-10*1.3806e-23*T1/(6.63e-34*3e8))**(1.0/b)
+    tau_mean = tau_0*((l/l_0)**(1.0/b))*8.0*(np.pi**4)/(15.0*integral(b)) +min_delay 
+    tau_mean = tau_mean - min_delay # set zero point to min delay    
+    
+    if (conv==True):
+        t = t+tau_mean # Shift time grid to centre on mean
+        psi =np.zeros(len(t))
+        ts = t[t>0]
+        x = (l_0/l)*((ts/tau_0)**b)
+        psi[t>0] = ((l_0/l)**2)*(ts**(3.0*b - 2.0))*(tau_0**(1.0-3.0*b))*(x**2)/(np.cosh(x)-1.0)
+    else:
+        try:
+            t_shift = t - min_delay   
+            psi =np.zeros(len(t))
+            ts = t_shift[t_shift>0]
+            x = (l_0/l)*((t/tau_0)**b)
+            for i in range(len(t)):
+                if (t_shift[i] >0):
+                    psi[i] = ((l_0/l)**2)*(t[i]**(3.0*b - 2.0))*(tau_0**(1.0-3.0*b))*(x[i]**2)/(np.cosh(x[i])-1.0)
+                else:
+                    psi[i]=0.0
+        except:
+            psi = np.zeros(len(tau_0))        
+            for i in range(len(tau_0)):
+                t_shift = t - min_delay[i]
+                if (t_shift > 0):
+                    x = (l_0/l)*((t_shift/tau_0[i])**b[i])
+                    psi[i] = ((l_0/l)**2)*(t_shift**(3.0*b[i] - 2.0))*(tau_0[i]**(1.0-3.0*b[i]))*(x**2)/(np.cosh(x)-1.0)
+                else:
+                    psi[i]=0.0
+    return psi
+
+############################################
 
 
 
@@ -111,34 +242,59 @@ def RunningOptimalAverage(t_data, Flux, Flux_err, delta):
 
 
 
-def Con(delta, rms, a):
-    bounds = np.sqrt(delta**2 + rms**2)
-    x = np.linspace(0 - 5.0*bounds, 10.0*bounds, 200)
-    del2 = delta**2
-    rms2 = rms**2
-    a2 = a**2
-    x2 = x**2
-    absx = np.abs(x)
-    d = np.sqrt(del2 + rms2)
-    d2 = del2 + rms2
-    rp2 = np.sqrt(np.pi/2.0)
-    r2 = 1.0/np.sqrt(2.0)
-    
-    B = np.sqrt((1.0/del2) + (1.0/rms2))
-       
-    E = (-1.0*rp2*delta*B*rms2*special.erf(r2*x/(B*rms2))) + (rp2*rms*d*special.erf(x*delta/np.sqrt(2.*del2*rms2 + 2.*(rms2**2)))) +(rms*(rp2*delta*rms*B +rp2*d*special.erf(r2*((x*rms2) - (a*d2))/(delta*rms*d))))
-      
 
-    con = E*np.exp(-0.5*x2/d2)*delta/d2 # Trunc. Gaussian
-    #con = np.exp(-0.5*x2/d2) # Gaussian
+def Con2(delta, sig, mean, psi_type, min_delay, wavelengths, l_0, T1, b, integral):
+
+    if (sig > 0.001*delta):
+        if (delta<sig):
+            t_w = np.linspace(-4.*delta, 4.*delta, 50)
+            dt = t_w [1]-t_w [0]
+            t_s = np.arange(-4.*sig, 4.*sig, dt)
+            t = t_s
+        else:
+            t_s = np.linspace(-4.*sig, 4.*sig, 50)
+            dt = t_s [1]-t_s [0]
+            t_w = np.arange(-4.*delta, 4.*delta, dt)
+            t = t_w
+        w = np.exp(-0.5*(t_w/delta)**2)
+
+        # Transfer Function
+        if (psi_type == "Gaussian" and T1 == None):
+            #psi = Gaussian(mean, sig, t_s, conv = True)
+            c = np.exp(-0.5*((t**2)/(sig**2 + delta**2)))
+            dt = 0.0
+
+        elif(psi_type ==  "Uniform"and T1 == None):
+            psi = Uniform(mean, sig, t_s, conv = True)
+
+        elif(psi_type == "TruncGaussian"and T1 == None):
+            psi = TruncGaussian(mean, sig, t_s, min_delay, conv = True)
+        elif(psi_type == "LogGaussian"and T1 == None):
+            psi =  LogGaussian(mean, sig, t_s, min_delay, conv = True)   
+        elif(psi_type == "InverseGauss"and T1 == None):
+            psi =  InverseGaussian(mean, sig, t_s, min_delay, conv = True)   
+        elif(T1 != None):
+            psi = AccDisc(l_0, wavelengths - l_0, T1, b,integral,t_s, min_delay, conv = True)
+            
+            
+        if (psi_type != "Gaussian"):    
+            c = np.convolve(w, psi, mode="same")
+    else:
+         t_w = np.linspace(-4.*delta, 4.*delta, 50)
+         dt = 0.0#t_w [1]-t_w [0]
+         c = np.exp(-0.5*(t_w/delta)**2)
+         t = t_w
+         
+    #Calculate variance of new window function 
+    c_max = np.max(c)    
+    d = weighted_avg_and_std(t-0.5*dt, c/c_max)[1]
     
+    x = np.linspace(min(t-0.5*dt), max(t-0.5*dt), 200)
     
-    return con/np.max(con), x, d
-    
-    
+    return np.interp(x, t-0.5*dt,c/c_max), x, d
     
 
-def CalcWinds(t_data, Flux, Flux_err, delta, rmss, N, sizes,  taus):
+def CalcWinds(t_data, Flux, Flux_err, delta, rmss, N, sizes,  taus, psi_types, wavelengths, T1, b, integral):
 
 
 
@@ -157,12 +313,19 @@ def CalcWinds(t_data, Flux, Flux_err, delta, rmss, N, sizes,  taus):
 
 
 
-        #Needs generalised
-        factors[l:u, :] = np.sqrt(delta**2 + rmss[l]**2)/np.sqrt(delta**2 + rmss[l]**2+ (rmss[l]-rmss)**2)
+
+
         
         #Calculate convolution
-        cutoff = taus[0] - taus[l]
-        c, t, d = Con(delta, rmss[l], cutoff)
+        l_0 = wavelengths[0]
+        c, t, d = Con2(delta, rmss[l], taus[l], psi_types[i], taus[0], wavelengths[i], l_0, T1, b, integral)
+
+        #Calculate downweighting
+        #factors[l:u, :] = np.sqrt(delta**2 + rmss[l]**2)/np.sqrt(delta**2 + rmss[l]**2+ (rmss[l]-rmss)**2)     
+        dws = np.full(len(rmss), rmss[l])
+        dws[rmss>rmss[l]] = rmss[rmss>rmss[l]]
+        factors[l:u, :] = np.sqrt(d**2)/np.sqrt((d**2)+ (rmss[l]-dws)**2)       
+
         conv[l:u, :] = c
         ts[l:u, :] = t
         ds[l:u] = d
@@ -193,6 +356,7 @@ def RunningOptimalAverageConv(t_data, Flux, Flux_err, deltas, factors, conv, t):
     errs = np.empty(len(mjd))
     Ps = np.empty(len(mjd))
     
+
     for j in prange(len(mjd)):
 
         delta = deltas[j]
@@ -246,7 +410,9 @@ def RunningOptimalAverageConv(t_data, Flux, Flux_err, deltas, factors, conv, t):
             #Calculate error
             errs[j] = np.sqrt(1.0/w_sum)
         
-        Ps[j] = 1.0/((Flux_err[j]**2)*w_sum)
+
+       # Ps[j] = 1.0/((Flux_err[j]**2)*np.nansum(conv_use/(Flux_err_use**2)))
+        Ps[j] = 1.0/((Flux_err[j]**2)*w_sum)  
     P = np.nansum(Ps)
     return mjd, model, errs, P
 
@@ -396,15 +562,34 @@ def CalculateP(t_data, Flux, Flux_err, delta):
     
     
 
-    
 
     
+#Transform from peak of trucated gaussian to mean 
+def peaktomean(mu, a, rms):
+    alpha = (a-mu)/rms
+    phi = (1.0/np.sqrt(2.0*np.pi))*np.exp(-0.5*alpha**2)
+    Z = 1 - 0.5*(1+scipy.special.erf(alpha/np.sqrt(2.0)))
+    return mu + rms*phi/Z  
     
+#Transform from rms of Gaussian to std of trunc gaussian
+def rmstostd(mu, a, rms):
+    alpha = (a-mu)/rms
+    phi = (1.0/np.sqrt(2.0*np.pi))*np.exp(-0.5*alpha**2)
+    Z = 1 - 0.5*(1+scipy.special.erf(alpha/np.sqrt(2.0)))
+    return np.sqrt((rms**2)*(1.0 + (alpha*phi/Z) - (phi/Z)**2))
+    
+#Return the weighted average and standard deviation of any delay distribution function
+def weighted_avg_and_std(values, weights):
 
+    average = np.average(values, weights=weights)
+    variance = np.average((values-average)**2, weights=weights)
+    return (average, np.sqrt(variance))    
     
-    
-    
-        
+def integrand(x, b):
+    return (x**(4 - 1/b))/(np.cosh(x)-1.0)
+def integrand2(x, b):
+    return (x**(4 + 1/b))/(np.cosh(x)-1.0)
+            
 ############################################### Echo Mapping Model ####################################################
 
 
@@ -412,34 +597,47 @@ def CalculateP(t_data, Flux, Flux_err, delta):
 
     
 #BIC
-def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delta, P_func, slow_comps, P_slow, init_delta, delay_dist, pos_ref):
+def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delta, P_func, slow_comps, P_slow, init_delta, delay_dist, psi_types, pos_ref, AccDisc, wavelengths, integral, integral2):
 
-
-    Nchunk = 3
+    Nchunk = 2
+    if (AccDisc == False):
+        Nchunk+=1
+    
     if (add_var == True):
         Nchunk +=1
-    if (delay_dist == True):
+    if (delay_dist == True and AccDisc == False):
         Nchunk+=1
-        param_delete=2
-    else:
-        param_delete=1
-        
 
-    Npar =  Nchunk*len(data) + 1
-        
-    chunk_size = int((Npar - 1)/len(data))
+
+    Npar =  Nchunk*len(data) + 1    
+    if (AccDisc==True):
+        Npar =  Nchunk*len(data) + 3    
+
+      
+    chunk_size = Nchunk#int((Npar - 1)/len(data))
 
     #Break params list into chunks of 3 i.e A, B, tau in each chunk
     params_chunks = [params[i:i + chunk_size] for i in range(0, len(params), chunk_size )] 
     
     #Extract delta and extra variance parameters as last in params list
-    if (delay_dist == True):
+    if (delay_dist == True and AccDisc == False):
         delta = params_chunks[-1][0]
         rmss = np.zeros(size)
         taus = np.zeros(size)
     
-    else:
+    if (AccDisc == False):
         delta = params_chunks[-1][0]
+        wavelengths = [None]*len(data)
+        T1 = None 
+        b = None
+        integral = None
+        
+    if (AccDisc == True):
+        T1 = params_chunks[-1][0]
+        b = params_chunks[-1][1]
+        rmss = np.zeros(size)
+        taus = np.zeros(size)
+        delta = params_chunks[-1][2]
 
     #Loop through each lightcurve and shift data by parameters
     merged_mjd = np.zeros(size)
@@ -450,16 +648,29 @@ def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delt
     sizes = np.zeros(int(len(data)+1))
     for i in range(len(data)):
         A = params_chunks[i][0]
-        B = params_chunks[i][1]   
-        tau = params_chunks[i][2]
+        B = params_chunks[i][1] 
+        if (AccDisc==False):  
+            tau = params_chunks[i][2]
+        else:
+            l_0 = wavelengths[0]
+            l = wavelengths[i] - l_0        
+            l_delay_ref = wavelengths[pos_ref] - l_0
+            tau_0 = (l_0*1e-10*1.3806e-23*T1/(6.63e-34*3e8))**(1.0/b)
+            tau = tau_0*((l/l_0)**(1.0/b))*8.0*(np.pi**4)/(15.0*integral(b)) - tau_0*((l_delay_ref/l_0)**(1.0/b))*8.0*(np.pi**4)/(15.0*integral(b)) #Measure mean from delay reference
+            tau_rms = np.sqrt((tau_0**2)*((l/l_0)**(2.0/b))*integral2(b)/integral(b))
+            
+
         if (add_var == True):
             V =  params_chunks[i][-1]
             
-        if (delay_dist == True):
+        if (delay_dist == True and AccDisc == False):
             if (i>0):
                 tau_rms = params_chunks[i][3]
             else:
-                tau_rms=delta/100.0
+                tau_rms=0.0
+                
+        
+
 
 
             
@@ -498,7 +709,7 @@ def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delt
             merged_mjd[int(j+ prev)] = mjd[j]
             merged_flux[int(j+ prev)] = flux[j]
             merged_err[int(j+ prev)] = err[j]
-            if (delay_dist == True):
+            if (delay_dist == True or AccDisc == True):
                 rmss[int(j+ prev)] = tau_rms
                 taus[int(j+ prev)] = tau
                # factors[int(j+ prev)] = delta/np.sqrt(delta**2 + (tau_rms)**2)#/delta
@@ -509,7 +720,8 @@ def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delt
 
 
     #Calculate ROA to merged lc
-    if (delay_dist == False):
+    if (delay_dist == False and AccDisc == False):
+
         t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta)
         
         #Normalise lightcurve
@@ -530,8 +742,9 @@ def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delt
          
     #Calculate no. of paramters for delay_dist==True here, actual ROA calcualted in loop per lightcurve   
     else:
-        factors, conv, x, d = CalcWinds(merged_mjd, merged_flux, merged_err, delta, rmss, len(data), sizes,  taus)
+        factors, conv, x, d = CalcWinds(merged_mjd, merged_flux, merged_err, delta, rmss, len(data), sizes,  taus, psi_types, wavelengths, T1, b, integral)
         t,m,errs, P = RunningOptimalAverageConv(merged_mjd, merged_flux, merged_err, d, factors, conv, x) 
+        
 
 
 
@@ -543,7 +756,15 @@ def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delt
 
         A = params_chunks[i][0]
         B = params_chunks[i][1] 
-        tau = params_chunks[i][2] 
+        if (AccDisc==False):  
+            tau = params_chunks[i][2]
+        else:
+            l_0 = wavelengths[0]
+            l = wavelengths[i] - l_0        
+            l_delay_ref = wavelengths[pos_ref] - l_0
+            tau_0 = (l_0*1e-10*1.3806e-23*T1/(6.63e-34*3e8))**(1.0/b)
+            tau = tau_0*((l/l_0)**(1.0/b))*8.0*(np.pi**4)/(15.0*integral(b)) - tau_0*((l_delay_ref/l_0)**(1.0/b))*8.0*(np.pi**4)/(15.0*integral(b)) #Measure mean from delay reference
+            tau_rms = np.sqrt((tau_0**2)*((l/l_0)**(2.0/b))*integral2(b)/integral(b))
         if (add_var == True):
             V =  params_chunks[i][-1]
 
@@ -559,7 +780,7 @@ def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delt
 
 
 
-        if (delay_dist == False):
+        if (delay_dist == False and AccDisc == False):
             t_shifted = t + tau
             #interp = interpolate.interp1d(t_shifted, m, kind="linear", fill_value="extrapolate")
             m_m = m#interp(t)
@@ -579,13 +800,14 @@ def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delt
             
         #Calculate ROA at mjd of each lightcurve using different delta
         else:
-            if (i>0):
-                tau_rms =params_chunks[i][3]
-            else:
-                tau_rms=delta/100.0
-           # delta_new = np.sqrt(delta**2 + (tau_rms)**2)
-          #  factor = delta/np.sqrt(delta**2 + (tau_rms)**2)
-            
+            if (AccDisc == False):
+                if (i>0):
+                    tau_rms = params_chunks[i][3]
+                else:
+                    tau_rms=0.0
+            #else:
+             #   tau_rms = params_chunks[-1][1]*(((wavelengths[i]/wavelengths[0]) - 0.999)**params_chunks[-1][2])
+
             
             
             
@@ -626,18 +848,23 @@ def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delt
     
     lprob = np.sum(lps)  
     
+
     #Calculate Penalty
     Penalty = 0.0
     for i in range(len(data)):
         mjd = data[i][:,0]
         
+        
         if (i==pos_ref):
 
             Penalty = Penalty + float(chunk_size+P_slow[i] - 1.0)*np.log(len(mjd))
         else:
-            Penalty = Penalty + float(chunk_size+P_slow[i])*np.log(len(mjd))        
-            
-    Penalty = Penalty + (P*np.log(len(merged_flux)))
+            Penalty = Penalty + float(chunk_size+P_slow[i])*np.log(len(mjd))
+                    
+    if (AccDisc == True):            
+        Penalty = Penalty + ((P+2.0)*np.log(len(merged_flux)))
+    else:
+        Penalty = Penalty + (P*np.log(len(merged_flux)))   
         
     BIC =  lprob + Penalty
 
@@ -652,18 +879,21 @@ def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delt
     
  
 #Priors
-def log_prior(params, priors, add_var, data, delay_dist):
-    Nchunk = 3
+def log_prior(params, priors, add_var, data, delay_dist, AccDisc, wavelengths):
+    Nchunk = 2
+    if (AccDisc == False):
+        Nchunk+=1
+    
     if (add_var == True):
         Nchunk +=1
-    if (delay_dist == True):
+    if (delay_dist == True and AccDisc == False):
         Nchunk+=1
 
-        
-    Npar =  Nchunk*len(data) + 1
-    
-    
-    chunk_size = int((Npar - 1)/len(data))
+
+    Npar =  Nchunk*len(data) + 1    
+    if (AccDisc==True):
+        Npar =  Nchunk*len(data) + 3   
+    chunk_size = Nchunk#int((Npar - 1)/len(data))
 
 
     #Break params list into chunks of 3 i.e A, B, tau in each chunk
@@ -676,23 +906,36 @@ def log_prior(params, priors, add_var, data, delay_dist):
     #Read in priors
     A_prior = priors[0]
     B_prior = priors[1]
-    tau_prior = priors[2]
-    delta_prior = priors[3]
-    if (add_var == True): 
-        V_prior = priors[4]
+    if (AccDisc == False):
+        tau_prior = priors[2]
+        delta_prior = priors[3]
+        if (add_var == True): 
+            V_prior = priors[4]
     
-    if (delay_dist == True):
-        rms_prior_width = priors[5]
+
+    if (AccDisc == True):
+        T1_prior = priors[-3]
+        b_prior = priors[-2]
+        T1 = params_chunks[-1][0]
+        b = params_chunks[-1][1]
+        if (add_var == True): 
+            V_prior = priors[2]
+        delta = params_chunks[-1][2]
+        delta_prior=priors[-1]
+        
 
     
     check=[]
     #V_priors=np.empty(len(data))
     #Loop over lightcurves
     pr=[]
+    
+
     for i in range(len(data)):
         A = params_chunks[i][0]
         B = params_chunks[i][1]
-        tau = params_chunks[i][2]
+        if (AccDisc == False):
+            tau = params_chunks[i][2]
         
         if (add_var == True):
             V =  params_chunks[i][-1]
@@ -701,11 +944,11 @@ def log_prior(params, priors, add_var, data, delay_dist):
         if (delay_dist == True and i>0):
             if (params_chunks[i][3]>=0.0):
                 tau_rms = params_chunks[i][3]
-                pr.append(2.0*np.log((1.0/np.sqrt(2.0*np.pi*(rms_prior_width**2)))*np.exp(-0.5*(tau_rms/rms_prior_width)**2)))
+                #pr.append(2.0*np.log((1.0/np.sqrt(2.0*np.pi*(rms_prior_width**2)))*np.exp(-0.5*(tau_rms/rms_prior_width)**2)))
+                check.append(0.0)
             else:
                 check.append(1.0)
-        else:
-            pr.append(0.0)
+
             
         #Force peak delays to be larger than blurring reference
         if (delay_dist == True):
@@ -713,25 +956,44 @@ def log_prior(params, priors, add_var, data, delay_dist):
                 check.append(0.0)
             else:
                 check.append(1.0)
+        else:
+            pr.append(0.0)
 
 
-             
-        if (add_var == True):
-            if A_prior[0] <= A <= A_prior[1] and B_prior[0] <= B <= B_prior[1] and tau_prior[0] <= tau <= tau_prior[1] and V_prior[0]<= V <= V_prior[1]:
+        if (AccDisc == True):
+            if T1_prior[0] <= T1 <= T1_prior[1] and b_prior[0] <= b <= b_prior[1]:
                 check.append(0.0)
             else:
                 check.append(1.0)
         else:
-            if A_prior[0] <= A <= A_prior[1] and B_prior[0] <= B <= B_prior[1] and tau_prior[0] <= tau <= tau_prior[1]:
+            if tau_prior[0] <= tau <= tau_prior[1]:
                 check.append(0.0)
             else:
                 check.append(1.0)
+             
+        if (add_var == True):
+            if V_prior[0]<= V <= V_prior[1]:
+                check.append(0.0)
+            else:
+                check.append(1.0)
+ 
+                
+                
+        
+        if A_prior[0] <= A <= A_prior[1] and B_prior[0] <= B <= B_prior[1]:
+            check.append(0.0)
+        else:
+            check.append(1.0)
+                
+                
+                
+
 
                
                     
             
     if np.sum(np.array(check)) == 0.0 and delta_prior[0]<= delta <= delta_prior[1]:
-        return 0.0 + np.sum(pr)
+        return 0.0 #+ np.sum(pr)
     else:
         return -np.inf
 
@@ -740,69 +1002,93 @@ def log_prior(params, priors, add_var, data, delay_dist):
     
     
 #Probability
-def log_probability(params, data, priors, add_var, size, sig_level, include_slow_comp, slow_comp_delta,P_func, slow_comps, P_slow, init_delta, delay_dist, pos_ref):
+def log_probability(params, data, priors, add_var, size, sig_level, include_slow_comp, slow_comp_delta,P_func, slow_comps, P_slow, init_delta, delay_dist, psi_types, pos_ref, AccDisc, wavelengths, integral, integral2):
 
 
+        
+        
     #Insert t1 as zero for syntax
-
-
-    Nchunk = 3
+    Nchunk = 2
+    if (AccDisc == False):
+        Nchunk+=1
+    
     if (add_var == True):
         Nchunk +=1
-    if (delay_dist == True):
+    if (delay_dist == True and AccDisc == False):
         Nchunk+=1
         if (pos_ref == 0):
             params=np.insert(params, [2], [0.0])    #Insert zero for reference delay dist
         else:
             params=np.insert(params, [3], [0.0])    #Insert zero for reference delay dist
                  
-    Npar =  Nchunk*len(data) + 1
+
+    Npar =  Nchunk*len(data) + 1    
+    if (AccDisc==True):
+        Npar =  Nchunk*len(data) + 3  
+        
     pos = pos_ref*Nchunk + 2
-    params=np.insert(params, pos, [0.0])    #Insert zero for reference delay 
+    if (AccDisc == False):
+        params=np.insert(params, pos, [0.0])    #Insert zero for reference delay 
     
     
     
     
-    lp = log_prior(params, priors, add_var, data, delay_dist)
+    lp = log_prior(params, priors, add_var, data, delay_dist,  AccDisc, wavelengths)
     if not np.isfinite(lp):
         return -np.inf
-    return lp - BIC(params, data, add_var, size, sig_level, include_slow_comp, slow_comp_delta,P_func, slow_comps, P_slow, init_delta, delay_dist, pos_ref)
+    return lp - BIC(params, data, add_var, size, sig_level, include_slow_comp, slow_comp_delta,P_func, slow_comps, P_slow, init_delta, delay_dist,psi_types, pos_ref, AccDisc, wavelengths, integral, integral2)
 
     
     
 
+def flatten(t):
+    return [item for sublist in t for item in sublist]
 
 
 
-
-
+#Model
+def Slow(t, S0, dS, t0):
+    return S0 + dS*(((t -t0)**2.0))
      
 
-def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nburnin, include_slow_comp, slow_comp_delta, calc_P, delay_dist, pos_ref):
+def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nburnin, include_slow_comp, slow_comp_delta, calc_P, delay_dist, psi_types, pos_ref, AccDisc, wavelengths, filters, use_backend, resume_progress):
 
-    Nchunk = 3
+    
+    Nchunk = 2
+    if (AccDisc == False):
+        Nchunk+=1
+    
     if (add_var == True):
         Nchunk +=1
-    if (delay_dist == True):
+    if (delay_dist == True and AccDisc == False):
         Nchunk+=1
         param_delete=2
     else:
         param_delete=1
         
+        
+        
 
     Npar =  Nchunk*len(data) + 1    
-
+    if (AccDisc==True):
+        Npar =  Nchunk*len(data) + 3    
+        param_delete=0
+        delta = 0.0
+       # import warnings
+       # warnings.filterwarnings("ignore")
     ########################################################################################    
     #Run MCMC to fit to data
     
     #Choose intial conditions from mean and rms of data
     pos = [0]*Npar
     labels = [None]*Npar
-    chunk_size = int((Npar - 1)/len(data))
+    chunk_size = Nchunk#int((Npar - 1)/len(data))
     
     pos_chunks = [pos[i:i + chunk_size] for i in range(0, len(pos), chunk_size)]
     labels_chunks = [labels[i:i + chunk_size] for i in range(0, len(labels), chunk_size)]
     
+
+        
     size = 0
     merged_mjd = []
     merged_flux = []
@@ -827,7 +1113,7 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
             pos_chunks[i][1] = np.mean(flux)#- m_s(mjd)) #Set initial B to mean of data
             
             
-        pos_chunks[i][2] = init_tau[i]
+
         
 
         
@@ -837,14 +1123,16 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
             labels_chunks[i][-1] = "\u03C3"+str(i)
             
             
-        if (delay_dist == True):
+        if (delay_dist == True and AccDisc == False):
             pos_chunks[i][3] = 1.0
             labels_chunks[i][3]="\u0394"+str(i)
+       
                        
         labels_chunks[i][0] = "A"+str(i)
-        labels_chunks[i][1] = "B"+str(i)        
-        labels_chunks[i][2] = "\u03C4" + str(i)
-        
+        labels_chunks[i][1] = "B"+str(i)
+        if (AccDisc == False):        
+            labels_chunks[i][2] = "\u03C4" + str(i)
+            pos_chunks[i][2] = init_tau[i]
         #Add shifted data to merged lightcurve        
         for j in range(len(mjd)):
             merged_mjd.append(mjd[j]-init_tau[i])
@@ -859,9 +1147,10 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
     #Calculate no. of parameters for a grid of deltas over the prior range
     if (calc_P == True):
         print("Calculating No. of parameters beforehand...")
-        deltas=np.arange(priors[3][0], priors[3][1], 0.02)
+        deltas=np.arange(priors[3][0], priors[3][1], 0.01)
         ps=np.empty(len(deltas))
         for i in tqdm(range(len(deltas))):
+
             ps[i]=CalculateP(merged_mjd, merged_flux, merged_err, deltas[i])
             
         #P as a func of delta
@@ -873,7 +1162,13 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
     if (include_slow_comp==True):
         for i in range(len(data)):
             t_sl, m_sl, errs_sl = RunningOptimalAverage(data[i][:,0], data[i][:,1], data[i][:,2], slow_comp_delta)
-            m_sl = m_sl - np.mean(m_sl)            
+            
+            #params, pcov = scipy.optimize.curve_fit(Slow, data[i][:,0], data[i][:,1], p0=[4., -1.0, 59300] ,sigma=data[i][:,2], absolute_sigma=False)
+           # perr = np.sqrt(np.diag(pcov))        
+            t_sl=np.linspace(min(data[i][:,0]), max(data[i][:,0]), 1000)
+            #m_sl = Slow(t_sl, params[0], params[1],params[2])
+            #errs_sl = np.zeros(1000)
+            #m_sl = Slow(np.linspace(59100, 59500, 1000), params[0], params[1],params[2]) - np.mean(m_sl)            
             slow_comps.append([t_sl, m_sl, errs_sl])
             P_slow[i] = CalculateP(data[i][:,0], data[i][:,1], data[i][:,2], slow_comp_delta)
             
@@ -881,18 +1176,50 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
    
                         
 
-    pos_chunks[-1][0] = init_delta#Initial delta
-    labels_chunks[-1][0] = "\u0394"
-    
 
+    if (AccDisc == True):
+        pos_chunks[-1][0] = 1.0e4
+        labels_chunks[-1][0] = "T1"
+        pos_chunks[-1][1] = 0.75
+        labels_chunks[-1][1] = "\u03B2"
+        pos_chunks_table = pos_chunks
+        labels_chunks_table = labels_chunks
+        pos_chunks[-1][2] = init_delta#Initial delta
+        labels_chunks[-1][2] = "\u0394"
+        
+        #Integral and interpolate
+        Is=[]
+        bs = np.linspace(0.34, 10.0, 5000)
+        for i in range(len(bs)):
+            Is.append(quad(integrand, 0, np.inf, args=(bs[i]))[0])
+        integral= interpolate.interp1d(bs, Is, kind="linear", fill_value="extrapolate")
+        Is=[]
+        bs = np.linspace(0.34, 10.0, 5000)
+        for i in range(len(bs)):
+            Is.append(quad(integrand2, 0, np.inf, args=(bs[i]))[0])
+        integral2= interpolate.interp1d(bs, Is, kind="linear", fill_value="extrapolate")
+
+        
+        
+    else:
+        pos_chunks[-1][0] = init_delta#Initial delta
+        labels_chunks[-1][0] = "\u0394"
+        integral=None
+        integral2=None
+        
     pos = list(chain.from_iterable(pos_chunks))#Flatten into single array
     labels = list(chain.from_iterable(labels_chunks))#Flatten into single array
+
     
     pos_rem = pos_ref*Nchunk + 2
-    pos = np.delete(pos, pos_rem) 
-    labels = np.delete(labels, pos_rem)
+    if (AccDisc == False):
+
+        pos = np.delete(pos, pos_rem) 
+        labels = np.delete(labels, pos_rem)
     
-    if (delay_dist==True):
+        
+
+    if (delay_dist==True and AccDisc == False):
         if (pos_ref == 0):
             pos = np.delete(pos, [2]) 
             labels = np.delete(labels, [2])
@@ -902,8 +1229,9 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
 
 
     print("Initial Parameter Values")
+
     table = [pos]
-    print(tabulate(table, headers=labels))
+    print(tabulate(table, headers=labels))        
     
    
     
@@ -915,10 +1243,19 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
     print("NWalkers="+str(int(2.0*Npar)))
     
     
-
+    #Backend
+    if (use_backend == True):
+        filename = "Fit.h5"
+        backend = emcee.backends.HDFBackend(filename)
+        if (resume_progress == True):
+            print("Backend size: {0}".format(backend.iteration))
+            pos = None
+    else:
+        backend = None
+    
     with Pool() as pool:
 
-        sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability, args=[data, priors, add_var, size,sig_level, include_slow_comp, slow_comp_delta, P_func, slow_comps, P_slow, init_delta, delay_dist, pos_ref], pool=pool)
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability, args=[data, priors, add_var, size,sig_level, include_slow_comp, slow_comp_delta, P_func, slow_comps, P_slow, init_delta, delay_dist, psi_types, pos_ref, AccDisc, wavelengths, integral, integral2], pool=pool, backend=backend)
         sampler.run_mcmc(pos, Nsamples, progress=True);
 
     #Extract samples with burn-in of 1000
@@ -926,21 +1263,21 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
 
          
     samples = sampler.get_chain()
+
     
-    
-    
+
     #####################################################################################
     # Repeat data shifting and ROA fit using best fit parameters
     
     transpose_samples = np.transpose(samples_flat)
 
-    if (delay_dist==True):
+    if (delay_dist==True and AccDisc == False):
         if (pos_ref == 0):
             transpose_samples=np.insert(transpose_samples, [2], np.array([0.0]*len(transpose_samples[1])), axis=0)              #Insert zero for reference delay dist
         else:
             transpose_samples=np.insert(transpose_samples, [3], np.array([0.0]*len(transpose_samples[1])), axis=0)              #Insert zero for reference delay dist  
-
-    transpose_samples= np.insert(transpose_samples, pos_rem, np.array([0.0]*len(transpose_samples[1])), axis=0)    #Insert zero for reference delay          
+    if (AccDisc == False):
+        transpose_samples= np.insert(transpose_samples, pos_rem, np.array([0.0]*len(transpose_samples[1])), axis=0)    #Insert zero for reference delay          
                      
     #Split samples into chunks
     samples_chunks = [transpose_samples[i:i + chunk_size] for i in range(0, len(transpose_samples), chunk_size)] 
@@ -948,14 +1285,24 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
     
     
     #Extract delta and extra variance parameters as last in params list
-    if (delay_dist == True):
+    if (AccDisc == False):
+        delta = np.percentile(samples_chunks[-1][0], [16, 50, 84])[1]
+        wavelengths = [None]*len(data)
+        T1 = None 
+        b = None
+        integral = None
+    
+    
+    if (delay_dist == True and AccDisc == False):
         delta = np.percentile(samples_chunks[-1][0], [16, 50, 84])[1]
         rmss = np.zeros(size)
         taus = np.zeros(size)
-    
-    else:
-        delta = np.percentile(samples_chunks[-1][0], [16, 50, 84])[1]
-
+    if (AccDisc == True):
+        rmss = np.zeros(size)
+        taus = np.zeros(size)
+        T1 = np.percentile(samples_chunks[-1][0], [16, 50, 84])[1]
+        b = np.percentile(samples_chunks[-1][1], [16, 50, 84])[1]
+        delta = np.percentile(samples_chunks[-1][2], [16, 50, 84])[1]
     #Loop through each lightcurve and shift data by parameters
     merged_mjd = np.zeros(size)
     merged_flux = np.zeros(size)
@@ -972,35 +1319,69 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
         
         A = np.percentile(samples_chunks[i][0], [16, 50, 84])[1]
         B = np.percentile(samples_chunks[i][1], [16, 50, 84])[1]
-        tau = np.percentile(samples_chunks[i][2], [16, 50, 84])[1]
+        if (AccDisc == False):
+            tau = np.percentile(samples_chunks[i][2], [16, 50, 84])[1]
+            params.append([A, B, tau])    
+        else:
+            l_0 = wavelengths[0]
+            l = wavelengths[i] - l_0        
+            l_delay_ref = wavelengths[pos_ref] - l_0
+            tau_0 = (l_0*1e-10*1.3806e-23*T1/(6.63e-34*3e8))**(1.0/b)
+            tau = tau_0*((l/l_0)**(1.0/b))*8.0*(np.pi**4)/(15.0*integral(b)) - tau_0*((l_delay_ref/l_0)**(1.0/b))*8.0*(np.pi**4)/(15.0*integral(b)) #Measure mean from delay reference
+            tau_rms = np.sqrt((tau_0**2)*((l/l_0)**(2.0/b))*integral2(b)/integral(b))
+            params.append([A, B])    
+        #Print delays
         
-        if (add_var == True):
-            V =  np.percentile(samples_chunks[i][-1], [16, 50, 84])[1]
-        if (delay_dist == True):
+        if (delay_dist == True and AccDisc == False):
+            smpls = samples_chunks[i][2]
+            if (psi_types[i] == "TruncGaussian"):
+                smpls = peaktomean(samples_chunks[i][2], samples_chunks[0][2], samples_chunks[i][3])
+            mean_delay = np.percentile(smpls, [16, 50, 84])
+            if (i != pos_ref):
+                print("Filter: " + str(filters[i]))
+                print('Mean Delay, error: %10.5f  (+%10.5f -%10.5f)'%(mean_delay[1], mean_delay[1] - mean_delay[0], mean_delay[2] - mean_delay[1]))
+            else:
+                print("Filter: " + str(filters[i]))
+                print("Mean Delay, error: 0.00 (fixed)")
+        elif(delay_dist == False and AccDisc == False):
+            delay = np.percentile(samples_chunks[i][2], [16, 50, 84])
+            if (i != pos_ref):
+                print("Filter: " + str(filters[i]))
+                print('Delay, error: %10.5f  (+%10.5f -%10.5f)'%(delay[1], delay[1] - delay[0], delay[2] - delay[1]))  
+            else:
+                print("Filter: " + str(filters[i]))
+                print("Delay, error: 0.00 (fixed)")
+                
+        if (AccDisc == True):
+            tau_0_samples =  (l_0*1e-10*1.3806e-23*samples_chunks[-1][0]/(6.63e-34*3e8))**(1.0/samples_chunks[-1][1])
+            tau_samples = tau_0_samples*((l/l_0)**(1.0/samples_chunks[-1][1]))*8.0*(np.pi**4)/(15.0*integral(samples_chunks[-1][1])) - tau_0_samples*((l_delay_ref/l_0)**(1.0/samples_chunks[-1][1]))*8.0*(np.pi**4)/(15.0*integral(samples_chunks[-1][1]))
+            mean_delay = np.percentile(tau_samples, [16, 50, 84])
+            if (i != pos_ref):
+                print("Filter: " + str(filters[i]))
+                print('Mean Delay, error: %10.5f  (+%10.5f -%10.5f)'%(mean_delay[1], mean_delay[1] - mean_delay[0], mean_delay[2] - mean_delay[1]))
+            else:
+                print("Filter: " + str(filters[i]))
+                print("Mean Delay, error: 0.00 (fixed)")
+            
+                
+            
+        if (delay_dist == True and AccDisc == False):
+            #if (PowerLaw == False):
             if (i>0):
                 tau_rms = np.percentile(samples_chunks[i][3], [16, 50, 84])[1]
-            else:
-                tau_rms=delta/100.0
-                
-
-            
-
-        params.append([A, B, tau])    
-        
-        if (delay_dist == True):
-            if (i>0):
                 params.append([tau_rms])
             else:
-                params.append([0.0])            
-                    
+                tau_rms=0.0
+                params.append([0.0])
+           # else:
+               # tau_rms =  np.percentile(samples_chunks[-1][1], [16, 50, 84])[1]*(((wavelengths[i]/wavelengths[0]) - 0.999)** np.percentile(samples_chunks[-1][2], [16, 50, 84])[1])               
+
             
-        #Add extra variance
-        if (add_var ==True):
+        if (add_var == True):
+            V =  np.percentile(samples_chunks[i][-1], [16, 50, 84])[1]
             err = np.sqrt((err**2) + (V**2))
-            params.append([V])
-
-
-                
+            params.append([V])            
+                           
 
 
         if (include_slow_comp==True):
@@ -1021,30 +1402,35 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
             merged_mjd[int(j+ prev)] = mjd[j]
             merged_flux[int(j+ prev)] = flux[j]
             merged_err[int(j+ prev)] = err[j]
-            if (delay_dist == True):
+            if (delay_dist == True or AccDisc == True):
                 rmss[int(j+ prev)] = tau_rms
                 taus[int(j+ prev)] = tau                
                 #factors[int(j+ prev)] = delta/np.sqrt(delta**2 + (tau_rms)**2)#/delta
      
         prev = int(prev + len(mjd))
     
+    if (AccDisc == False):
+        params.append([delta])
+    else:
+        params.append([T1, b])
 
-    params.append([delta])
             
     params = list(chain.from_iterable(params))#Flatten into single array
     
     
-      
-    params=np.delete(params, pos_rem)   
+    if (AccDisc == False):  
+        params=np.delete(params, pos_rem)   
     
-    if (delay_dist==True):
+    if (delay_dist==True and AccDisc == False):
         if (pos_ref==0):
             params=np.delete(params, [2])
         else:      
             params=np.delete(params, [3])   
     #Calculate ROA to merged lc
 
-    if (delay_dist == False):
+    if (delay_dist == False and AccDisc == False):
+    
+
         t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta)
 
     
@@ -1060,7 +1446,7 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
         
     else:
        # ws = CalcWind(merged_mjd, delta, rmss)
-        factors, conv, x, d= CalcWinds(merged_mjd, merged_flux, merged_err, delta, rmss, len(data), sizes,  taus)       
+        factors, conv, x, d = CalcWinds(merged_mjd, merged_flux, merged_err, delta, rmss, len(data), sizes,  taus, psi_types, wavelengths, T1, b, integral)
         t,m_all,errs_all, P_all = RunningOptimalAverageConv(merged_mjd, merged_flux, merged_err, d, factors, conv, x)     
 
         #t,m_all,errs_all = RunningOptimalAverage3(merged_mjd, merged_flux, merged_err, delta, rmss, ws)
@@ -1083,10 +1469,18 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
         
         A = np.percentile(samples_chunks[i][0], [16, 50, 84])[1]
         B = np.percentile(samples_chunks[i][1], [16, 50, 84])[1]
-        tau = np.percentile(samples_chunks[i][2], [16, 50, 84])[1]       
+        if (AccDisc == False):
+            tau = np.percentile(samples_chunks[i][2], [16, 50, 84])[1]       
+        else:
+            l_0 = wavelengths[0]
+            l = wavelengths[i] - l_0        
+            l_delay_ref = wavelengths[pos_ref] - l_0
+            tau_0 = (l_0*1e-10*1.3806e-23*T1/(6.63e-34*3e8))**(1.0/b)
+            tau = tau_0*((l/l_0)**(1.0/b))*8.0*(np.pi**4)/(15.0*integral(b)) - tau_0*((l_delay_ref/l_0)**(1.0/b))*8.0*(np.pi**4)/(15.0*integral(b)) #Measure mean from delay reference
+            tau_rms = np.sqrt((tau_0**2)*((l/l_0)**(2.0/b))*integral2(b)/integral(b))
         
 
-        if (delay_dist == False):
+        if (delay_dist == False and AccDisc == False):
             t_shifted = t + tau
             #interp = interpolate.interp1d(t_shifted, m, kind="linear", fill_value="extrapolate")
             m_m = m#interp(t)
@@ -1110,12 +1504,16 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
             
             
         else:
-            if (i>0):
-                tau_rms = np.percentile(samples_chunks[i][3], [16, 50, 84])[1]
-            else:
-                tau_rms=delta/100.0
-            delta_new = np.sqrt(delta**2 + (tau_rms)**2)
+            if (AccDisc == False):
+                if (i>0):
+                    tau_rms = np.percentile(samples_chunks[i][3], [16, 50, 84])[1]
+                else:
+                    tau_rms=0.0
+           # else:
+                #tau_rms =  np.percentile(samples_chunks[-1][1], [16, 50, 84])[1]*(((wavelengths[i]/wavelengths[0]) - 0.999)** np.percentile(samples_chunks[-1][2], [16, 50, 84])[1])      
 
+                
+            delta_new = np.max(d)
             
             mx=max(merged_mjd)
             mn=min(merged_mjd)
@@ -1143,14 +1541,15 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
                 model = A*Xs + B
         
             model_errs = errss*A
-            models.append([t+tau, model, model_errs])         
+            models.append([t+tau, model, model_errs])
             
             if (i ==0):         
                 t,m,errs = [t+tau, Xs,errss]
                        
         prev = int(prev + len(mjd))
         
-        
+    print("")
+    print("")   
     print("Best Fit Parameters")
     table = [params]
     print(tabulate(table, headers=labels))
@@ -1170,6 +1569,8 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
     filehandler = open(b"Lightcurve_models.obj","wb")
     pickle.dump(models,filehandler)
     
+        
+    
     
     #Plot Corner Plot
     plt.rcParams.update({'font.size': 15})
@@ -1183,7 +1584,7 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
     
     
     #print("Autocorrelation time: ", sampler.get_autocorr_time())
-    return samples, samples_flat, t, m, errs, slow_comps, params, models
+    return samples, samples_flat, t, m, errs, slow_comps_out, params, models
 
 
 
@@ -1191,7 +1592,7 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
 
 
 class Fit():
-    def __init__(self, datadir, objName, filters, priors, init_tau = None, init_delta=1.0, delay_dist=False , add_var=True, sig_level = 4.0, Nsamples=10000, Nburnin=5000, include_slow_comp=False, slow_comp_delta=30.0, delay_ref = None, calc_P=False):
+    def __init__(self, datadir, objName, filters, priors, init_tau = None, init_delta=1.0, delay_dist=False , psi_types = None, add_var=True, sig_level = 4.0, Nsamples=10000, Nburnin=5000, include_slow_comp=False, slow_comp_delta=30.0, delay_ref = None, calc_P=False, AccDisc=False, wavelengths=None, use_backend = False, resume_progress = False):
         self.datadir=datadir
         self.objName=objName
         self.filters=filters
@@ -1217,8 +1618,14 @@ class Fit():
             
             
         self.delay_dist = delay_dist
-
-        
+        if (delay_dist==True):
+            self.psi_types = psi_types
+            if (psi_types==None):
+                self.psi_types = ["Gaussian"]*len(filters)
+            else:
+                self.psi_types = np.insert(psi_types, [0], psi_types[0])
+        else:
+            self.psi_types = [None]*len(filters)
         
         self.sig_level = sig_level
         self.Nsamples = Nsamples
@@ -1231,6 +1638,10 @@ class Fit():
         self.delay_ref_pos = np.where(np.array(filters) == self.delay_ref)[0]
         if (init_tau == None):
             self.init_tau = [0]*len(data)
+            if (delay_dist == True):
+                self.init_tau = [1.0]*len(data)
+            if (AccDisc == True):
+                self.init_tau = 5.0*(((np.array(wavelengths)/wavelengths[0]))**1.4)
         else:
             Nchunk = 3
             if (self.add_var == True):
@@ -1244,9 +1655,11 @@ class Fit():
         self.slow_comp_delta=slow_comp_delta
         
         self.calc_P=calc_P
-        
-        
-        run = FullFit(data, self.priors, self.init_tau, self.init_delta, self.add_var, self.sig_level, self.Nsamples, self.Nburnin, self.include_slow_comp, self.slow_comp_delta, self.calc_P, self.delay_dist, self.delay_ref_pos)
+        self.AccDisc = AccDisc
+        self.wavelengths = wavelengths
+        self.use_backend = use_backend
+        self.resume_progress = resume_progress
+        run = FullFit(data, self.priors, self.init_tau, self.init_delta, self.add_var, self.sig_level, self.Nsamples, self.Nburnin, self.include_slow_comp, self.slow_comp_delta, self.calc_P, self.delay_dist, self.psi_types, self.delay_ref_pos, self.AccDisc, self.wavelengths, self.filters, self.use_backend, self.resume_progress)
 
         self.samples = run[0]
         self.samples_flat = run[1]
@@ -1309,11 +1722,18 @@ def Plot(Fit):
     
     transpose_samples = np.transpose(samples_flat)      
     
+
         
-    Nchunk = 3
+
+    Nchunk = 2
+    if (Fit.AccDisc == False):
+        Nchunk+=1
+       
+        
+    
     if (Fit.add_var == True):
         Nchunk +=1
-    if (Fit.delay_dist == True):
+    if (Fit.delay_dist == True and Fit.AccDisc == False):
         Nchunk+=1
         
         if (Fit.delay_ref_pos == 0):
@@ -1327,21 +1747,38 @@ def Plot(Fit):
         param_delete=1
         
 
-
                  
     Npar =  Nchunk*len(data) + 1
+    if (Fit.AccDisc == True):
+        Npar =  Nchunk*len(data) + 3
+        
     pos = Fit.delay_ref_pos*Nchunk + 2
-    transpose_samples= np.insert(transpose_samples, pos, np.array([0.0]*len(transpose_samples[1])), axis=0)    #Insert zero for reference delay 
-    
+    if (Fit.AccDisc == False):
+        transpose_samples= np.insert(transpose_samples, pos, np.array([0.0]*len(transpose_samples[1])), axis=0)    #Insert zero for reference delay 
+
     
 
-        
-    chunk_size = int((Npar - 1)/len(data))
-        
+    chunk_size = Nchunk#int((Npar - 1)/len(data))
 
-        
            
-    samples_chunks = [transpose_samples[i:i + chunk_size] for i in range(0, len(transpose_samples), chunk_size)]        
+    samples_chunks = [transpose_samples[i:i + chunk_size] for i in range(0, len(transpose_samples), chunk_size)]
+    
+            
+    if (Fit.AccDisc == True):
+        T1 = np.percentile(samples_chunks[-1][0], [16, 50, 84])[1]
+        b = np.percentile(samples_chunks[-1][1], [16, 50, 84])[1]        
+                #Integral and interpolate
+        Is=[]
+        bs = np.linspace(0.34, 10.0, 5000)
+        for i in range(len(bs)):
+            Is.append(quad(integrand, 0, np.inf, args=(bs[i]))[0])
+        integral= interpolate.interp1d(bs, Is, kind="linear", fill_value="extrapolate")
+        Is=[]
+        bs = np.linspace(0.34, 10.0, 5000)
+        for i in range(len(bs)):
+            Is.append(quad(integrand2, 0, np.inf, args=(bs[i]))[0])
+        integral2= interpolate.interp1d(bs, Is, kind="linear", fill_value="extrapolate")
+        
         
     fig = plt.figure(100)
     gs = fig.add_gridspec(len(filters), 2, hspace=0, wspace=0, width_ratios=[5, 1])
@@ -1352,9 +1789,25 @@ def Plot(Fit):
         #Read in parameter values
         A = np.percentile(samples_chunks[j][0], [16, 50, 84])[1]
         B = np.percentile(samples_chunks[j][1], [16, 50, 84])[1]
-        tau = np.percentile(samples_chunks[j][2], [16, 50, 84])       
-        tss.append(tau[1])
-        tau_samples=samples_chunks[j][2]
+        if (Fit.AccDisc == False):
+            tau = np.percentile(samples_chunks[j][2], [16, 50, 84])[1]
+            tau_samples=samples_chunks[j][2]
+            if (Fit.delay_dist == True):
+                tau_rms = np.percentile(samples_chunks[j][3], [16, 50, 84])[1]
+        else:
+            l_0 = Fit.wavelengths[0]
+            l = Fit.wavelengths[j] - l_0        
+            l_delay_ref = Fit.wavelengths[Fit.delay_ref_pos] - l_0
+            tau_0 = (l_0*1e-10*1.3806e-23*T1/(6.63e-34*3e8))**(1.0/b)
+            tau = tau_0*((l/l_0)**(1.0/b))*8.0*(np.pi**4)/(15.0*integral(b)) - tau_0*((l_delay_ref/l_0)**(1.0/b))*8.0*(np.pi**4)/(15.0*integral(b)) #Measure mean from delay reference
+            tau_rms = np.sqrt((tau_0**2)*((l/l_0)**(2.0/b))*integral2(b)/integral(b))
+            
+            if (j==0):
+                min_delay = tau
+            
+            tau_samples = (l_0*1e-10*1.3806e-23*samples_chunks[-1][0]/(6.63e-34*3e8))**(1.0/samples_chunks[-1][1])*((l/l_0)**(1.0/samples_chunks[-1][1]))*8.0*(np.pi**4)/(15.0*integral(samples_chunks[-1][1])) - (l_0*1e-10*1.3806e-23*samples_chunks[-1][0]/(6.63e-34*3e8))**(1.0/samples_chunks[-1][1])*((l_delay_ref/l_0)**(1.0/samples_chunks[-1][1]))*8.0*(np.pi**4)/(15.0*integral(samples_chunks[-1][1]))
+        tss.append(tau)
+
         
         mjd = data[j][:,0]
         flux = data[j][:,1]
@@ -1383,12 +1836,40 @@ def Plot(Fit):
         
         axs[j][0].annotate(filters[j], xy=(0.85, 0.85), xycoords='axes fraction', size=15.0, color=band_colors[j], fontsize=20) 
         
-        frq, edges = np.histogram(tau_samples, bins=50)        
-        if (Fit.delay_dist==True):
-            tau_rms = np.percentile(samples_chunks[j][3], [16, 50, 84])
-            norm = 1.0 / ((tau_rms[1]) * np.sqrt(2.0 * np.pi))
+        
+      #  if (i>0 and i!=Fit.delay_ref_pos):
+         #   smpls = peaktomean(samples_chunks[j][2], samples_chunks[0][2], samples_chunks[j][3])
+       # else:
+        smpls = tau_samples
+        if (Fit.psi_types[j] == "TruncGaussian" and Fit.AccDisc == False):
+            smpls = peaktomean(samples_chunks[j][2], samples_chunks[0][2], samples_chunks[j][3])
+        
+        frq, edges = np.histogram(smpls, bins=50)        
+        if (Fit.delay_dist==True or Fit.AccDisc == True):
+            
+            
+            # Transfer Function
+            if (Fit.psi_types[j] == "Gaussian"and Fit.AccDisc == False):
+                psi = Gaussian(tau, tau_rms, np.linspace(-4.0*tau_rms, 4.0*tau_rms, 200), conv = False)
+            elif(Fit.psi_types[j] ==  "Uniform"and Fit.AccDisc == False):
+                psi = Uniform(tau, tau_rms, np.linspace(-4.0*tau_rms, 4.0*tau_rms, 200), conv = False) 
+            elif(Fit.psi_types[j] ==  "TruncGaussian"and Fit.AccDisc == False):
+                psi = TruncGaussian(tau, tau_rms, np.linspace(-4.0*tau_rms, 4.0*tau_rms, 200), np.percentile(samples_chunks[0][2], [16, 50, 84])[1], conv = True) 
+            elif(Fit.psi_types[j] == "LogGaussian"and Fit.AccDisc == False):
+                psi = LogGaussian(tau, tau_rms, np.linspace(tau-4.0*tau_rms,tau+ 4.0*tau_rms, 200), np.percentile(samples_chunks[0][2], [16, 50, 84])[1], conv=False)
+            elif(Fit.psi_types[j] == "InverseGaussian"and Fit.AccDisc == False):
+                psi = InverseGaussian(tau, tau_rms, np.linspace(tau-4.0*tau_rms,tau+ 4.0*tau_rms, 200), np.percentile(samples_chunks[0][2], [16, 50, 84])[1], conv=False)    
+            elif (Fit.AccDisc == True):
+                if (j>0):
+                    psi = AccDisc(Fit.wavelengths[0], Fit.wavelengths[j] - Fit.wavelengths[0], T1, b, integral, np.linspace(tau-4.0*tau_rms,tau+ 4.0*tau_rms, 200), min_delay,conv = False)
+                else:
+                    psi = np.ones(200)
+                
+                        
+                
+            norm = np.max(psi)
             norm = norm/max(frq)
-            if (Fit.delay_ref_pos>0 and j==0):
+            if (Fit.delay_ref_pos>0 and j==0 and Fit.AccDisc == False):
                 norm = 1.0
             
         else:
@@ -1400,23 +1881,21 @@ def Plot(Fit):
 
         axs[j][1].bar(edges[:-1], frq*norm, width=np.diff(edges), edgecolor=band_colors[j], align="edge", color=band_colors[j])  
         #axs[j][1].hist(tau_samples, color=band_colors[j], bins=50, density=True)
-        axs[j][1].axvline(x = np.percentile(tau_samples, [16, 50, 84])[1], color="black")
-        axs[j][1].axvline(x = np.percentile(tau_samples, [16, 50, 84])[0] , color="black", ls="--")
-        axs[j][1].axvline(x = np.percentile(tau_samples, [16, 50, 84])[2], color="black",ls="--")
+        axs[j][1].axvline(x = np.percentile(smpls, [16, 50, 84])[1], color="black")
+        axs[j][1].axvline(x = np.percentile(smpls, [16, 50, 84])[0] , color="black", ls="--")
+        axs[j][1].axvline(x = np.percentile(smpls, [16, 50, 84])[2], color="black",ls="--")
         axs[j][1].axvline(x = 0, color="black",ls="--")    
         axs[j][1].set_xlabel("Time Delay (Days)")
 
-        if (Fit.delay_dist==True):
-            if (j>0):
+        if (Fit.delay_dist==True or Fit.AccDisc == True):
+            if (j>0 and Fit.AccDisc == False):
 
                 tau_rms = np.percentile(samples_chunks[j][3], [16, 50, 84])
             
                 length=10.0*tau_rms[1]
-                taus=np.arange(tau[1] - 5.0*tau_rms[1], tau[1] + 5.0*tau_rms[1], length/500)
-                
-                
-                #G=models.Gaussian1D(amplitude=1 / ((tau_rms[1]) * np.sqrt(2 * np.pi)), mean=tau[1], stddev=tau_rms[1])
-
+                taus=np.arange(tau - 5.0*tau_rms[1], tau + 5.0*tau_rms[1], length/500)
+                if(Fit.psi_types[j] == "LogGaussian" or Fit.psi_types[j] == "InverseGaussian"):
+                    taus=np.linspace(tss[0]-tau_rms[1], np.percentile(samples_chunks[-2][2], [16, 50, 84])[1] + 5.0*tau_rms[1]  , 600)
             
                 #Limits for errors
                 up=[]
@@ -1425,26 +1904,34 @@ def Plot(Fit):
                 for k in range(len(taus)):
                     rms_samples = samples_chunks[j][3]
                     mean_samples = samples_chunks[j][2]
-                    cutoff_samples = samples_chunks[0][2]
 
-
-
-                    if (taus[k]>=tss[0]):
-                        G=1.0/((rms_samples) * np.sqrt(2 * np.pi)) *np.exp(-0.5*((taus[k] - mean_samples)/rms_samples)**2)
-                    else:
-                        G=np.zeros(len(mean_samples))
-                    percent =  np.percentile(G, [16, 50, 84])
+                    # Transfer Function
+                    if (Fit.psi_types[j] == "Gaussian"and Fit.AccDisc == False):
+                        psi = Gaussian(mean_samples, rms_samples, taus[k], conv = False)
+                    elif(Fit.psi_types[j] ==  "Uniform"and Fit.AccDisc == False):
+                        psi = Uniform(mean_samples, rms_samples, taus[k], conv = False)
+                    elif(Fit.psi_types[j] ==  "TruncGaussian"and Fit.AccDisc == False):  
+                        psi = TruncGaussian(mean_samples, rms_samples, taus[k], samples_chunks[0][2], conv = False)  
+                    elif(Fit.psi_types[j] == "LogGaussian"and Fit.AccDisc == False):
+                        psi = LogGaussian(mean_samples, rms_samples, taus[k], samples_chunks[0][2], conv = False)   
+                    elif(Fit.psi_types[j] == "InverseGauss"and Fit.AccDisc == False):
+                        psi = InverseGaussian(mean_samples, rms_samples, taus[k], samples_chunks[0][2], conv = False)       
+                    elif (Fit.AccDisc == True):
+                        psi = AccDisc(l_0, l, samples_chunks[-1][0], samples_chunks[-1][1], integral, taus[k], min_delay, conv = False)
+                     
+                    percent =  np.percentile(psi, [16, 50, 84])
                     up.append(percent[0])
                     Gs.append(percent[1])
                     low.append(percent[2])
-                    
-                    
-                    
+
                 axs[j][1].plot( taus, Gs, color="black", lw=1.5)                    
                 
                 axs[j][1].fill_between(taus, up, low, color="black", alpha=0.5, edgecolor='none', rasterized=True, antialiased=True)
+                
+
+
     length = max(tss)-min(tss)        
-    axs[-1][1].set_xlim(min(tss)-0.5*length, max(tss)+0.5*length)
+    axs[-1][1].set_xlim(min(tss)-1.0*length, max(tss)+1.0*length)
             
             
             
