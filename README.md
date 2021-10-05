@@ -21,6 +21,11 @@ Install using pip: pip install PyROA
 
 ## Changes
 
+#### v3.0.0
+- Re-implemented the delay distribution function to now use a numerical convolution. This allows any type of transfer function to be modelled.
+- Added use of the emcee backend, which allows saving and resuming of progress.
+
+
 #### v2.0.2
 - Fixed bug in calculating the slow component.
 
