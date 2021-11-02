@@ -2278,6 +2278,7 @@ def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter):
                     
     print("<A> = ", np.mean(A_values))
     print("<B> = ", np.mean(B_values))
+    print("<Delta> = ", delta)
     
 
     plt.rcParams.update({'font.size': 15})
