@@ -208,19 +208,22 @@ datadir : string :</strong> Directory of lightcurves in format "objName_image.da
 
 If you use this code please cite ([Donnan et al. 2021](https://ui.adsabs.harvard.edu/abs/2021arXiv210712318D/abstract)):
 
-@ARTICLE{2021arXiv210712318D, \
-       author = {{Donnan}, Fergus R. and {Horne}, Keith and {Hern{\'a}ndez Santisteban}, Juan V.}, \
-        title = "{Bayesian Analysis of Quasar Lightcurves with a Running Optimal Average: New Time Delay Measurements of COSMOGRAIL Gravitationally Lensed Quasars}", \
-      journal = {arXiv e-prints}, \
-     keywords = {Astrophysics - Instrumentation and Methods for Astrophysics, Astrophysics - Astrophysics of Galaxies}, \
-         year = 2021, \
-        month = jul, \
-          eid = {arXiv:2107.12318}, \
-        pages = {arXiv:2107.12318}, \
-archivePrefix = {arXiv}, \
-       eprint = {2107.12318}, \
- primaryClass = {astro-ph.IM}, \
-       adsurl = {https://ui.adsabs.harvard.edu/abs/2021arXiv210712318D}, \
-      adsnote = {Provided by the SAO/NASA Astrophysics Data System} \
-} 
+@ARTICLE{2021MNRAS.508.5449D,
+       author = {{Donnan}, Fergus R. and {Horne}, Keith and {Hern{\'a}ndez Santisteban}, Juan V.},
+        title = "{Bayesian analysis of quasar light curves with a running optimal average: new time delay measurements of COSMOGRAIL gravitationally lensed quasars}",
+      journal = {\mnras},
+     keywords = {gravitational lensing: strong, methods: data analysis, quasars: general, Astrophysics - Instrumentation and Methods for Astrophysics, Astrophysics - Astrophysics of Galaxies},
+         year = 2021,
+        month = dec,
+       volume = {508},
+       number = {4},
+        pages = {5449-5467},
+          doi = {10.1093/mnras/stab2832},
+archivePrefix = {arXiv},
+       eprint = {2107.12318},
+ primaryClass = {astro-ph.IM},
+       adsurl = {https://ui.adsabs.harvard.edu/abs/2021MNRAS.508.5449D},
+      adsnote = {Provided by the SAO/NASA Astrophysics Data System}
+}
+
 
