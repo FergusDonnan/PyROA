@@ -2412,7 +2412,8 @@ class InterCalibrate():
 
         print(" >>>>> DELTA <<<<< ",run[9])
         np.savetxt(datadir + str(self.objName) +"_"+ str(self.filter) +  ".dat",
-                 np.transpose([run[5], run[6], run[7],scopes_array, run[8],model_j1,error_j1]))
+                 np.transpose([run[5], run[6], run[7],scopes_array, run[8],model_j1,error_j1]),
+                  fmt="%15.7f %12.6f %12.6f %15s %12.6f %12.6f %12.6f")
                     #           MJD  , Flux  , Error , scopes     , DoF   ,   Model, Error_model,
         
         plt.rcParams.update({
