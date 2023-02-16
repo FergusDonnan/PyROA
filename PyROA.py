@@ -155,6 +155,57 @@ def AccDisc(l_0, l, T1, b,integral,t, min_delay, conv):
 
 
 
+@jit(nopython=True, cache=True, parallel=True)
+def CalculatePorc(t_data, Flux, Flux_err, delta):
+
+    Ps = np.empty(len(t_data))
+    for i in prange(len(t_data)):
+    
+    
+        #Only include significant data points
+        t_data_use = t_data[np.where(np.absolute(t_data[i]-t_data) < 5.0*delta)[0]]
+        Flux_err_use = Flux_err[np.where(np.absolute(t_data[i]-t_data) < 5.0*delta)[0]]
+
+        
+        if (len(np.where(np.absolute(t_data[i]-t_data) < 5.0*delta)[0])==0):
+            #Define Gaussian Memory Function
+            w =np.exp(-0.5*(((t_data[i]-t_data)/delta)**2))/(Flux_err**2)
+
+            #1/cosh Memory function
+            #w = 1.0/((Flux_err**2)*np.cosh((t_data[i]-t_data)/delta))
+
+            #Lorentzian
+           # w = 1.0/((Flux_err**2)*(1.0+((t_data[i]-t_data)/delta)**2))
+           
+           #Boxcar
+            #w=np.full(len(Flux_err), 0.01)
+
+            
+            
+        else:
+        
+            #Define Gaussian Memory Function
+            w =np.exp(-0.5*(((t_data[i]-t_data_use)/delta)**2))/(Flux_err_use**2)
+
+            #1/cosh Memory function
+            #w = 1.0/((Flux_err_use**2)*np.cosh((t_data[i]-t_data_use)/delta))
+
+            #Lorentzian
+            #w = 1.0/((Flux_err_use**2)*(1.0+((t_data[i]-t_data_use)/delta)**2))
+            
+            #Boxcar
+            #w=1.0/(Flux_err_use**2)
+        w_sum = np.nansum(w)
+
+        #P= P + 1.0/((Flux_err[i]**2)*np.nansum(w))
+        if (w_sum==0):
+            w_sum = 1e-300
+        Ps[i] = 1.0/((Flux_err[i]**2)*w_sum)
+
+    return Ps
+    
+    
+
 
 
 
