@@ -23,8 +23,8 @@ from astropy.modeling import models
 from scipy import signal
 from scipy.ndimage import gaussian_filter1d
 from scipy.integrate import quad
-
-
+import csv
+from pandas import DataFrame
 
 #Response Functions
 ##########################################
@@ -2226,7 +2226,8 @@ def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter,pl
     nwalkers, ndim = pos.shape
     with Pool() as pool:
 
-        sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability2, args=(data, priors, sig_level), pool=pool)
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability2, 
+                                        args=(data, priors, sig_level), pool=pool)
         sampler.run_mcmc(pos, Nsamples, progress=True);
     
     #Extract samples with burn-in of 1000
@@ -2375,7 +2376,7 @@ class InterCalibrate():
                 print("")
             else:
                 data.append(np.loadtxt(file))
-                scopes_array.append(scopes[i]*np.loadtxt(file).shape[0])
+                scopes_array.append([scopes[i]]*np.loadtxt(file).shape[0])
             
         scopes_array = [item for sublist in scopes_array for item in sublist]
         
@@ -2411,11 +2412,25 @@ class InterCalibrate():
         print(error_j1.shape)
 
         print(" >>>>> DELTA <<<<< ",run[9])
-        np.savetxt(datadir + str(self.objName) +"_"+ str(self.filter) +  ".dat",
-                 np.transpose([run[5], run[6], run[7],scopes_array, run[8],model_j1,error_j1]),
-                  fmt="%15.7f %12.6f %12.6f %15s %12.6f %12.6f %12.6f")
+        #np.savetxt(datadir + str(self.objName) +"_"+ str(self.filter) +  ".dat",
+        #            np.transpose([run[5], run[6], run[7], scopes_array, run[8], model_j1, error_j1]),
+        #            fmt="%15.7f %12.6f %12.6f %15s %12.6f %12.6f %12.6f")
                     #           MJD  , Flux  , Error , scopes     , DoF   ,   Model, Error_model,
         
+        
+        df = DataFrame({
+                    'f1':run[5],
+                    'f2':run[6],
+                    'f3':run[7],
+                    'str1':scopes_array,
+                    'f4':run[8],
+                    'f5':model_j1,
+                    'f6':error_j1
+                    })
+        df.to_csv(datadir + str(self.objName) +"_"+ str(self.filter) +  ".dat",
+                header=False,sep=' ',float_format='%15.8e',index=False,
+                quoting=csv.QUOTE_NONE,escapechar=' ')
+
         plt.rcParams.update({
             "font.family": "Sans", 
             "font.serif": ["DejaVu"],
