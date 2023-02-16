@@ -1051,7 +1051,10 @@ def Slow(t, S0, dS, t0):
     return S0 + dS*(((t -t0)**2.0))
      
 
-def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nburnin, include_slow_comp, slow_comp_delta, calc_P, delay_dist, psi_types, pos_ref, AccDisc, wavelengths, filters, use_backend, resume_progress):
+def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, 
+            Nburnin, include_slow_comp, slow_comp_delta, calc_P, delay_dist,
+            psi_types, pos_ref, AccDisc, wavelengths, filters, use_backend, 
+            resume_progress, plot_corner):
 
     
     Nchunk = 2
@@ -1571,16 +1574,16 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
     
         
     
-    
-    #Plot Corner Plot
-    plt.rcParams.update({'font.size': 15})
-    #Save Cornerplot to figure
-    fig = corner.corner(samples_flat, labels=labels, quantiles=[0.16, 0.5, 0.84], show_titles=True, title_kwargs={"fontsize": 20});
-    i = 1
-    while os.path.exists('{}{:d}.pdf'.format("CornerPlot", i)):
-        i += 1
-    fig.savefig('{}{:d}.pdf'.format("CornerPlot", i))
-    plt.close();
+    if plot_corner:
+        #Plot Corner Plot
+        plt.rcParams.update({'font.size': 15})
+        #Save Cornerplot to figure
+        fig = corner.corner(samples_flat, labels=labels, quantiles=[0.16, 0.5, 0.84], show_titles=True, title_kwargs={"fontsize": 20});
+        i = 1
+        while os.path.exists('{}{:d}.pdf'.format("CornerPlot", i)):
+            i += 1
+        fig.savefig('{}{:d}.pdf'.format("CornerPlot", i))
+        plt.close();
     
     
     #print("Autocorrelation time: ", sampler.get_autocorr_time())
@@ -1592,7 +1595,11 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
 
 
 class Fit():
-    def __init__(self, datadir, objName, filters, priors, init_tau = None, init_delta=1.0, delay_dist=False , psi_types = None, add_var=True, sig_level = 4.0, Nsamples=10000, Nburnin=5000, include_slow_comp=False, slow_comp_delta=30.0, delay_ref = None, calc_P=False, AccDisc=False, wavelengths=None, use_backend = False, resume_progress = False):
+    def __init__(self, datadir, objName, filters, priors, init_tau = None, init_delta=1.0,
+                 delay_dist=False , psi_types = None, add_var=True, sig_level = 4.0, 
+                 Nsamples=10000, Nburnin=5000, include_slow_comp=False, slow_comp_delta=30.0, 
+                 delay_ref = None, calc_P=False, AccDisc=False, wavelengths=None, 
+                 use_backend = False, resume_progress = False, plot_corner=False):
         self.datadir=datadir
         self.objName=objName
         self.filters=filters
@@ -1659,7 +1666,11 @@ class Fit():
         self.wavelengths = wavelengths
         self.use_backend = use_backend
         self.resume_progress = resume_progress
-        run = FullFit(data, self.priors, self.init_tau, self.init_delta, self.add_var, self.sig_level, self.Nsamples, self.Nburnin, self.include_slow_comp, self.slow_comp_delta, self.calc_P, self.delay_dist, self.psi_types, self.delay_ref_pos, self.AccDisc, self.wavelengths, self.filters, self.use_backend, self.resume_progress)
+        run = FullFit(data, self.priors, self.init_tau, self.init_delta, self.add_var, 
+                      self.sig_level, self.Nsamples, self.Nburnin, self.include_slow_comp, 
+                      self.slow_comp_delta, self.calc_P, self.delay_dist, self.psi_types, 
+                      self.delay_ref_pos, self.AccDisc, self.wavelengths, self.filters, 
+                      self.use_backend, self.resume_progress,plot_corner)
 
         self.samples = run[0]
         self.samples_flat = run[1]
@@ -2124,7 +2135,7 @@ def log_probability2(params, data, priors, sig_level):
 
 
 
-def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter):
+def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter,plot_corner):
 
     ########################################################################################    
     #Run MCMC to fit to data
@@ -2228,7 +2239,7 @@ def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter):
     Calibrated_err = [] 
     
       
-
+    Porc=CalculatePorc(merged_mjd, merged_flux, merged_err, delta)
     
     for i in range(len(data)):
         A = np.percentile(samples_chunks[i][0], [16, 50, 84])[1]
@@ -2278,31 +2289,33 @@ def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter):
                     
     print("<A> = ", np.mean(A_values))
     print("<B> = ", np.mean(B_values))
-    print("<Delta> = ", delta)
     
-
-    plt.rcParams.update({'font.size': 15})
-    #Save Cornerplot to figure
-    fig = corner.corner(samples_flat, labels=labels, quantiles=[0.16, 0.5, 0.84], show_titles=True, title_kwargs={"fontsize": 20}, truths=params);
-    i = 0
-    while os.path.exists('{}{:d}.pdf'.format(str(filter)+"_Calibration_CornerPlot", i)):
-        i += 1
-    fig.savefig('{}{:d}.pdf'.format(str(filter)+"_Calibration_CornerPlot", i))
-    plt.close();
+    if plot_corner: 
+        plt.rcParams.update({'font.size': 15})
+        #Save Cornerplot to figure
+        fig = corner.corner(samples_flat, labels=labels, quantiles=[0.16, 0.5, 0.84], show_titles=True,
+                             title_kwargs={"fontsize": 20}, truths=params);
+        i = 0
+        while os.path.exists('{}{:d}.pdf'.format(str(filter)+"_Calibration_CornerPlot", i)):
+            i += 1
+        fig.savefig('{}{:d}.pdf'.format(str(filter)+"_Calibration_CornerPlot", i))
+        plt.close();
            
 
-    return samples, samples_flat, t, m, errs, Calibrated_mjd, Calibrated_flux, Calibrated_err
+    return samples, samples_flat, t, m, errs, Calibrated_mjd, Calibrated_flux, Calibrated_err, Porc, delta
 
 
 
 
 
 class InterCalibrate():
-    def __init__(self, datadir, objName, filter, scopes, priors, init_delta=1.0, sig_level = 4.0, Nsamples=15000, Nburnin=10000):
+    def __init__(self, datadir, objName, filter, scopes, priors, init_delta=1.0, sig_level = 4.0,
+                 Nsamples=15000, Nburnin=10000,plot_corner=False):
         self.datadir=datadir
         self.objName=objName
         self.filter=filter
         self.scopes=scopes
+        scopes_array = []
         data=[]
         for i in range(len(scopes)):
             file = datadir + str(self.objName) +"_"+ str(self.filter) + "_"+ str(self.scopes[i]) +".dat"
@@ -2311,8 +2324,9 @@ class InterCalibrate():
                 print("")
             else:
                 data.append(np.loadtxt(file))
+                scopes_array.append(scopes[i]*np.loadtxt(file).shape[0])
             
-
+        scopes_array = [item for sublist in scopes_array for item in sublist]
         
         self.priors= priors
         self.init_delta=init_delta
@@ -2321,7 +2335,8 @@ class InterCalibrate():
         self.Nburnin = Nburnin
 
         
-        run = InterCalib(data, self.priors, self.init_delta, self.sig_level, self.Nsamples, self.Nburnin, self.filter)
+        run = InterCalib(data, self.priors, self.init_delta, self.sig_level, self.Nsamples, 
+                        self.Nburnin, self.filter,plot_corner)
 
         self.samples = run[0]
         self.samples_flat = run[1]
@@ -2333,7 +2348,21 @@ class InterCalibrate():
         self.err=run[7]
         
         #Write to file
-        np.savetxt(datadir + str(self.objName) +"_"+ str(self.filter) +  ".dat", np.transpose([run[5], run[6], run[7]]))
+        ## JVHS changes
+
+        #Model
+        interp = interpolate.interp1d(run[2], run[3], kind="linear", fill_value="extrapolate")
+        model_j1 = interp(run[5])
+
+        print(model_j1.shape)
+        interp = interpolate.interp1d(run[2], run[4], kind="linear", fill_value="extrapolate")
+        error_j1 = interp(run[5])
+        print(error_j1.shape)
+
+        print(" >>>>> DELTA <<<<< ",run[9])
+        np.savetxt(datadir + str(self.objName) +"_"+ str(self.filter) +  ".dat",
+                 np.transpose([run[5], run[6], run[7],scopes_array, run[8],model_j1,error_j1]))
+                    #           MJD  , Flux  , Error , scopes     , DoF   ,   Model, Error_model,
         
         plt.rcParams.update({
             "font.family": "Sans", 
