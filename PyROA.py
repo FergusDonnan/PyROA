@@ -2428,7 +2428,7 @@ class InterCalibrate():
                     'f6':error_j1
                     })
         df.to_csv(datadir + str(self.objName) +"_"+ str(self.filter) +  ".dat",
-                header=False,sep=' ',float_format='%15.8e',index=False,
+                header=False,sep=' ',float_format='%25.15e',index=False,
                 quoting=csv.QUOTE_NONE,escapechar=' ')
 
         plt.rcParams.update({
