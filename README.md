@@ -1,7 +1,7 @@
 # PyROA
 
 ## Overview
-PyROA is a tool for modelling quasar lightcurves ([Donnan et al. 2021](https://ui.adsabs.harvard.edu/abs/2021arXiv210712318D/abstract)) where the variability is described using a running optimal average (ROA), and paramters are sampled using Markov Chain Monte Carlo (MCMC) techniques - specifically using emcee. Using a Bayesian approach, priors can be used on the sampled parameters.
+PyROA is a tool for modelling quasar lightcurves ([Donnan et al. 2021](https://ui.adsabs.harvard.edu/abs/2021arXiv210712318D/abstract)) where the variability is described using a running optimal average (ROA), and paramters are sampled using Markov Chain Monte Carlo (MCMC) techniques - specifically using emcee. Using a Bayesian approach, priors can be used on the sampled parameters. It can also intercalibrate same-filter ligthcurves from different telescopes and adjust their uncertainties accordingly ([Donnan et al. 2023](https://ui.adsabs.harvard.edu/abs/2023arXiv230209370D/abstract)).
 Currently it has three main uses:
 
 1. Determining the time delay between lightcurves at different wavelengths. 
@@ -20,6 +20,10 @@ Install using pip: pip install PyROA
 
 
 ## Changes
+
+#### v3.1.0
+- Added new utility functions (Utils.py) to analyse the outputs of PyROA. See the Utils_Tutorial for examples of usage. These include displaying lightcurve(+residuals), Convergence plots, corner and chain plots by parameter, Lag spectrum plot and Flux-Flux analysis plot.
+- Changes to the intercalibration files were added. It now outputs, for every datum the original telescope, ROA model+uncertainty at the point, and degree of freedom value.
 
 #### v3.0.0
 - Re-implemented the delay distribution function to now use a numerical convolution. This allows any type of transfer function to be modelled.
@@ -225,5 +229,25 @@ archivePrefix = {arXiv},
        adsurl = {https://ui.adsabs.harvard.edu/abs/2021MNRAS.508.5449D},
       adsnote = {Provided by the SAO/NASA Astrophysics Data System}
 }
+
+The intercalibration procedure is found at [Donnan et al. 2023](https://ui.adsabs.harvard.edu/abs/2023arXiv230209370D/abstract):
+
+@ARTICLE{2023arXiv230209370D,
+       author = {{Donnan}, Fergus R. and {Hern{\'a}ndez Santisteban}, Juan V. and {Horne}, Keith and {Hu}, Chen and {Du}, Pu and {Li}, Yan-Rong and {Xiao}, Ming and {Ho}, Luis C. and {Aceituno}, Jes{\'u}s and {Wang}, Jian-Min and {Guo}, Wei-Jian and {Yang}, Sen and {Jiang}, Bo-Wei and {Yao}, Zhu-Heng},
+        title = "{Testing Super-Eddington Accretion onto a Supermassive Black Hole: Reverberation Mapping of PG 1119+120}",
+      journal = {arXiv e-prints},
+     keywords = {Astrophysics - Astrophysics of Galaxies, Astrophysics - High Energy Astrophysical Phenomena},
+         year = 2023,
+        month = feb,
+          eid = {arXiv:2302.09370},
+        pages = {arXiv:2302.09370},
+          doi = {10.48550/arXiv.2302.09370},
+archivePrefix = {arXiv},
+       eprint = {2302.09370},
+ primaryClass = {astro-ph.GA},
+       adsurl = {https://ui.adsabs.harvard.edu/abs/2023arXiv230209370D},
+      adsnote = {Provided by the SAO/NASA Astrophysics Data System}
+}
+
 
 
