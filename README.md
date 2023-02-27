@@ -211,7 +211,7 @@ datadir : string :</strong> Directory of lightcurves in format "objName_image.da
 ## Citation
 
 If you use this code please cite ([Donnan et al. 2021](https://ui.adsabs.harvard.edu/abs/2021arXiv210712318D/abstract)):
-
+````
 @ARTICLE{2021MNRAS.508.5449D,
        author = {{Donnan}, Fergus R. and {Horne}, Keith and {Hern{\'a}ndez Santisteban}, Juan V.},
         title = "{Bayesian analysis of quasar light curves with a running optimal average: new time delay measurements of COSMOGRAIL gravitationally lensed quasars}",
@@ -229,9 +229,9 @@ archivePrefix = {arXiv},
        adsurl = {https://ui.adsabs.harvard.edu/abs/2021MNRAS.508.5449D},
       adsnote = {Provided by the SAO/NASA Astrophysics Data System}
 }
-
+````
 The intercalibration procedure is found at [Donnan et al. 2023](https://ui.adsabs.harvard.edu/abs/2023arXiv230209370D/abstract):
-
+````
 @ARTICLE{2023arXiv230209370D,
        author = {{Donnan}, Fergus R. and {Hern{\'a}ndez Santisteban}, Juan V. and {Horne}, Keith and {Hu}, Chen and {Du}, Pu and {Li}, Yan-Rong and {Xiao}, Ming and {Ho}, Luis C. and {Aceituno}, Jes{\'u}s and {Wang}, Jian-Min and {Guo}, Wei-Jian and {Yang}, Sen and {Jiang}, Bo-Wei and {Yao}, Zhu-Heng},
         title = "{Testing Super-Eddington Accretion onto a Supermassive Black Hole: Reverberation Mapping of PG 1119+120}",
@@ -248,6 +248,6 @@ archivePrefix = {arXiv},
        adsurl = {https://ui.adsabs.harvard.edu/abs/2023arXiv230209370D},
       adsnote = {Provided by the SAO/NASA Astrophysics Data System}
 }
-
+````
 
 
