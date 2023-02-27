@@ -2417,7 +2417,7 @@ class InterCalibrate():
         #            fmt="%15.7f %12.6f %12.6f %15s %12.6f %12.6f %12.6f")
                     #           MJD  , Flux  , Error , scopes     , DoF   ,   Model, Error_model,
         
-        
+        # Put all arrays in a pandas dataframe and export
         df = DataFrame({
                     'f1':run[5],
                     'f2':run[6],
