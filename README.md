@@ -16,8 +16,15 @@ If you have any queries, email me at: fergus.donnan@physics.ox.ac.uk
 
 ## Installation
 
-Install using pip: pip install PyROA
+Install the latest release using pip: 
+````
+pip install PyROA
+````
 
+or to UPDATE to the latest version on github (often has bugs fixed before version release on pip
+````
+pip install git+https://github.com/FergusDonnan/PyROA --force
+````
 
 ## Changes
 
