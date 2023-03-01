@@ -757,7 +757,7 @@ def FluxFlux(objName, filters, delay_ref, gal_ref,wavelengths,
                 x_gal = np.median(x_gal_mcmc)
                 x_gal_error = np.std(-cnu_mcmc/snu_mcmc)
                 
-            gal_spectrum_mcmc = np.median(cnu_mcmc) +  x_gal_mcmc+x_gal_mcmc.std() * np.median(snu_mcmc)
+            gal_spectrum_mcmc = np.median(cnu_mcmc) +  (x_gal_mcmc+x_gal_mcmc.std()) * np.median(snu_mcmc)
             
             gal_spectrum.append(gal_spectrum_mcmc.mean())
             gal_spectrum_err.append(gal_spectrum_mcmc.std())
