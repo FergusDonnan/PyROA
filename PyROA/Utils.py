@@ -9,6 +9,7 @@ import matplotlib.ticker as mtick
 import matplotlib.ticker as ticker
 import astropy.units as u
 import astropy.constants as ct
+from pandas import DataFrame
 
 def Chains(nparam,filters,delay_ref,
 				outputdir = './',
@@ -719,7 +720,7 @@ def FluxFlux(objName, filters, delay_ref, gal_ref,wavelengths,
     
     file = open(outputdir+xt_file,'rb')
     norm_lc = pickle.load(file)
-
+    wave = np.array(wavelengths)
 
     #Split samples into chunks, 4 per lightcurve i.e A, B, tau, sig
     chunk_size=4
@@ -825,6 +826,15 @@ def FluxFlux(objName, filters, delay_ref, gal_ref,wavelengths,
             max_flux = np.max([max_flux,np.max(data[:,1]*fac_flux[i+kk])])
         else:
         	kk = -1
+    fnu_f = np.array(fnu_f)
+    fnu_f_err = np.array(fnu_f_err)
+    fnu_b = np.array(fnu_b)
+    fnu_b_err = np.array(fnu_b_err)
+    slope = np.array(slope)
+    slope_err = np.array(slope_err)
+    gal_spectrum = np.array(gal_spectrum)
+    gal_spectrum_err = np.array(gal_spectrum_err)
+
     plt.axvline(x=np.median(x_gal_mcmc+x_gal_mcmc.std()),color='r',
     			linestyle='-.',label=r'Galaxy')
     plt.axvline(x=np.min(norm_lc[1]),color='k',
@@ -843,9 +853,9 @@ def FluxFlux(objName, filters, delay_ref, gal_ref,wavelengths,
     plt.tight_layout()
 
     if savefig:
-        if figname == None: figname = 'pyroa_fluxflux.pdf'
+        if figname == None: figname = 'pyroa'
         plt.savefig(figname+'_fluxflux.pdf')
-
+	
 
     if wavelengths != None:
         wave = np.array(wavelengths)
@@ -878,7 +888,7 @@ def FluxFlux(objName, filters, delay_ref, gal_ref,wavelengths,
         #print(fac_flux)
         plt.xscale('log')
         plt.yscale('log')
-        plt.xlim(np.min(wave)-100,np.max(wave)+100)
+        plt.xlim(np.min(wave/(1+redshift))-100,np.max(wave/(1+redshift))+100)
         #print(np.min(np.array(unred(wave,slope,ebv)))*0.7,max_flux*1.2)
         plt.ylim(np.min(np.array(unred(wave,slope,ebv)))*0.7*fac_flux[-1],max_flux*1.2)
         if limits != None: plt.ylim(limits[0],limits[1])
@@ -899,6 +909,29 @@ def FluxFlux(objName, filters, delay_ref, gal_ref,wavelengths,
             plt.savefig(figname+'_SED.pdf')
     else:
         print(' [PyROA] No wavelength list. Skipping SED plot.')
+        # Create output file from flux-flux analysis
+    #print(wave)
+    d = {'wave': wave, 
+    	'agn_b': np.array(fnu_b),
+    	'agn_b_err': np.array(fnu_b_err),
+    	'agn_f': np.array(fnu_f),
+    	'agn_f_err': np.array(fnu_f_err),
+    	'agn_rms': np.array(slope),
+    	'agn_rms_err':np.array(slope_err),
+    	'gal': np.array(gal_spectrum),
+    	'gal_err': np.array(gal_spectrum_err),
+    	'unred_agn_b': np.array(unred(wave,fnu_b,ebv)),
+    	'unred_agn_b_err': np.array(unred(wave,fnu_b_err,ebv)),
+    	'unred_agn_f': np.array(unred(wave,fnu_f,ebv)),
+    	'unred_agn_f_err': np.array(unred(wave,fnu_f_err,ebv)),
+    	'unred_agn_rms': np.array(unred(wave,slope,ebv)),
+    	'unred_agn_rms_err':np.array(unred(wave,slope_err,ebv)),
+    	'unred_gal': np.array(unred(wave,gal_spectrum,ebv)),
+    	'unred_gal_err': np.array(unred(wave,gal_spectrum_err,ebv))}
+    df = DataFrame(data=d)
+    if figname == None: figname = 'pyroa' 
+    df.to_csv(figname+'_fluxflux.csv',index=False)
+
 
 def Convergence(outputdir='./',samples_file='samples_flat.obj',burnin=0,
 				init_chain_length=100,savefig=True):
