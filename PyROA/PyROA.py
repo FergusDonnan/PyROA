@@ -462,9 +462,9 @@ def RunningOptimalAverageConv(t_data, Flux, Flux_err, deltas, factors, conv, t):
             errs[j] = np.sqrt(1.0/w_sum)
         
 
-       # Ps[j] = 1.0/((Flux_err[j]**2)*np.nansum(conv_use/(Flux_err_use**2)))
-        Ps[j] = 1.0/((Flux_err[j]**2)*w_sum)  
-    P = np.nansum(Ps)
+    #     Ps[j] = 1.0/((Flux_err[j]**2)*w_sum)  
+    # P = np.nansum(Ps)
+    P=1
     return mjd, model, errs, P
 
 
@@ -795,7 +795,8 @@ def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delt
     else:
         factors, conv, x, d = CalcWinds(merged_mjd, merged_flux, merged_err, delta, rmss, len(data), sizes,  taus, psi_types, wavelengths, T1, b, integral)
         t,m,errs, P = RunningOptimalAverageConv(merged_mjd, merged_flux, merged_err, d, factors, conv, x) 
-        
+        P=CalculateP(merged_mjd, merged_flux, merged_err, delta)
+
 
 
 
@@ -930,7 +931,7 @@ def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delt
     
  
 #Priors
-def log_prior(params, priors, add_var, data, delay_dist, AccDisc, wavelengths):
+def log_prior(params, priors, add_var, data, delay_dist, AccDisc, wavelengths, init_params_chunks):
     Nchunk = 2
     if (AccDisc == False):
         Nchunk+=1
@@ -983,13 +984,13 @@ def log_prior(params, priors, add_var, data, delay_dist, AccDisc, wavelengths):
     
 
     for i in range(len(data)):
-        A = params_chunks[i][0]
-        B = params_chunks[i][1]
+        A = params_chunks[i][0]/init_params_chunks[i][0] # Check A as a fraction of inital value to compare with prior
+        B = params_chunks[i][1]/init_params_chunks[i][1]
         if (AccDisc == False):
             tau = params_chunks[i][2]
         
         if (add_var == True):
-            V =  params_chunks[i][-1]
+            V =  params_chunks[i][-1]/(init_params_chunks[i][-1]*5)
             
             
         if (delay_dist == True and i>0):
@@ -1002,13 +1003,13 @@ def log_prior(params, priors, add_var, data, delay_dist, AccDisc, wavelengths):
 
             
         #Force peak delays to be larger than blurring reference
-        if (delay_dist == True):
-            if (tau >=params_chunks[0][2]):
-                check.append(0.0)
-            else:
-                check.append(1.0)
-        else:
-            pr.append(0.0)
+        # if (delay_dist == True):
+        #     if (tau >=params_chunks[0][2]):
+        #         check.append(0.0)
+        #     else:
+        #         check.append(1.0)
+        # else:
+        #     pr.append(0.0)
 
 
         if (AccDisc == True):
@@ -1053,7 +1054,7 @@ def log_prior(params, priors, add_var, data, delay_dist, AccDisc, wavelengths):
     
     
 #Probability
-def log_probability(params, data, priors, add_var, size, sig_level, include_slow_comp, slow_comp_delta,P_func, slow_comps, P_slow, init_delta, delay_dist, psi_types, pos_ref, AccDisc, wavelengths, integral, integral2):
+def log_probability(params, data, priors, add_var, size, sig_level, include_slow_comp, slow_comp_delta,P_func, slow_comps, P_slow, init_delta, delay_dist, psi_types, pos_ref, AccDisc, wavelengths, integral, integral2, init_params_chunks):
 
 
         
@@ -1084,7 +1085,7 @@ def log_probability(params, data, priors, add_var, size, sig_level, include_slow
     
     
     
-    lp = log_prior(params, priors, add_var, data, delay_dist,  AccDisc, wavelengths)
+    lp = log_prior(params, priors, add_var, data, delay_dist,  AccDisc, wavelengths, init_params_chunks)
     if not np.isfinite(lp):
         return -np.inf
     return lp - BIC(params, data, add_var, size, sig_level, include_slow_comp, slow_comp_delta,P_func, slow_comps, P_slow, init_delta, delay_dist,psi_types, pos_ref, AccDisc, wavelengths, integral, integral2)
@@ -1139,6 +1140,7 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
     chunk_size = Nchunk#int((Npar - 1)/len(data))
     
     pos_chunks = [pos[i:i + chunk_size] for i in range(0, len(pos), chunk_size)]
+
     labels_chunks = [labels[i:i + chunk_size] for i in range(0, len(labels), chunk_size)]
     
 
@@ -1162,10 +1164,13 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
             m_s = interpolate.interp1d(t_slow, m_slow, kind="linear", fill_value="extrapolate")
             pos_chunks[i][0] = np.std(flux - m_s(mjd)) #Set intial A to rms of data
             pos_chunks[i][1] = np.mean(flux- m_s(mjd)) #Set initial B to mean of data
+
+
         else:        
             pos_chunks[i][0] = pos_chunks[i][0] + np.std(flux)# - m_s(mjd)) #Set intial A to rms of data
             pos_chunks[i][1] = np.mean(flux)#- m_s(mjd)) #Set initial B to mean of data
             
+
             
 
         
@@ -1173,7 +1178,7 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
         
 
         if(add_var == True):
-            pos_chunks[i][-1] =  0.01 #Set initial V
+            pos_chunks[i][-1] =  np.mean(err)/5.0 #0.01 #Set initial V
             labels_chunks[i][-1] = "\u03C3"+str(i)
             
             
@@ -1261,6 +1266,9 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
         integral=None
         integral2=None
         
+    #Store initial values for use in prior
+    init_params_chunks = pos_chunks
+
     pos = list(chain.from_iterable(pos_chunks))#Flatten into single array
     labels = list(chain.from_iterable(labels_chunks))#Flatten into single array
 
@@ -1287,15 +1295,26 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
     table = [pos]
     print(tabulate(table, headers=labels))        
     
-   
+
     
 
     #Define starting position
     
-    pos = 1e-4 * np.random.randn(int(2.0*Npar), int(Npar - param_delete)) + pos
+    pos = 0.2*pos* np.random.randn(int(2.0*Npar), int(Npar - param_delete)) + pos
+
     nwalkers, ndim = pos.shape
     print("NWalkers="+str(int(2.0*Npar)))
-    
+    # Make sure initial positions aren't outside priors
+    # priors_upper=[]
+    # priors_lower=[]
+    # for i in range(len(priors)):
+    #     priors_upper.append(priors[i][0])
+    #     priors_lower.append(priors[i][1])
+
+    # for i in range(nwalkers):
+    #     pos[i,:][ pos[i,:] > priors_upper] = priors_upper[pos[i,:] > priors_upper]
+    #     pos[i,:][ pos[i,:] < priors_lower] = priors_lower[pos[i,:] < priors_lower]
+
     
     #Backend
     if (use_backend == True):
@@ -1309,7 +1328,7 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
     
     with Pool() as pool:
 
-        sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability, args=[data, priors, add_var, size,sig_level, include_slow_comp, slow_comp_delta, P_func, slow_comps, P_slow, init_delta, delay_dist, psi_types, pos_ref, AccDisc, wavelengths, integral, integral2], pool=pool, backend=backend)
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability, args=[data, priors, add_var, size,sig_level, include_slow_comp, slow_comp_delta, P_func, slow_comps, P_slow, init_delta, delay_dist, psi_types, pos_ref, AccDisc, wavelengths, integral, integral2, init_params_chunks], pool=pool, backend=backend)
         sampler.run_mcmc(pos, Nsamples, progress=True);
 
     #Extract samples with burn-in of 1000
@@ -1393,7 +1412,7 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
             mean_delay = np.percentile(smpls, [16, 50, 84])
             if (i != pos_ref):
                 print("Filter: " + str(filters[i]))
-                print('Mean Delay, error: %10.5f  (+%10.5f -%10.5f)'%(mean_delay[1], mean_delay[1] - mean_delay[0], mean_delay[2] - mean_delay[1]))
+                print('Mean Delay, error: %10.5f  (+%10.5f -%10.5f)'%(mean_delay[1], mean_delay[2] - mean_delay[1], mean_delay[1] - mean_delay[0]))
             else:
                 print("Filter: " + str(filters[i]))
                 print("Mean Delay, error: 0.00 (fixed)")
@@ -1401,7 +1420,7 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
             delay = np.percentile(samples_chunks[i][2], [16, 50, 84])
             if (i != pos_ref):
                 print("Filter: " + str(filters[i]))
-                print('Delay, error: %10.5f  (+%10.5f -%10.5f)'%(delay[1], delay[1] - delay[0], delay[2] - delay[1]))  
+                print('Delay, error: %10.5f  (+%10.5f -%10.5f)'%(delay[1], delay[2] - delay[1], delay[1] - delay[0]))  
             else:
                 print("Filter: " + str(filters[i]))
                 print("Delay, error: 0.00 (fixed)")
@@ -1412,7 +1431,7 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
             mean_delay = np.percentile(tau_samples, [16, 50, 84])
             if (i != pos_ref):
                 print("Filter: " + str(filters[i]))
-                print('Mean Delay, error: %10.5f  (+%10.5f -%10.5f)'%(mean_delay[1], mean_delay[1] - mean_delay[0], mean_delay[2] - mean_delay[1]))
+                print('Mean Delay, error: %10.5f  (+%10.5f -%10.5f)'%(mean_delay[1], mean_delay[2] - mean_delay[1], mean_delay[1] - mean_delay[0]))
             else:
                 print("Filter: " + str(filters[i]))
                 print("Mean Delay, error: 0.00 (fixed)")
@@ -1896,7 +1915,7 @@ def Plot(Fit):
         axs[j][0].set_ylim(min(flux)-0.2*length, max(flux)+0.2*length)
         axs[j][0].set_xlabel("MJD")
         
-        axs[j][0].annotate(filters[j], xy=(0.85, 0.85), xycoords='axes fraction', size=15.0, color=band_colors[j], fontsize=20) 
+        axs[j][0].annotate(filters[j], xy=(0.85, 0.85), xycoords='axes fraction', color=band_colors[j], fontsize=20) 
         
         
       #  if (i>0 and i!=Fit.delay_ref_pos):
@@ -2126,7 +2145,7 @@ def log_likelihood2(params, data, sig_level):
     
  
 #Priors
-def log_prior2(params, priors, s):
+def log_prior2(params, priors, s, init_params_chunks):
     #Break params list into chunks of 3 i.e A, B, tau in each chunk
     params_chunks = [params[i:i + 3] for i in range(0, len(params), 3)]
     
@@ -2148,7 +2167,7 @@ def log_prior2(params, priors, s):
     for i in range(s):
         A = params_chunks[i][0]
         B = params_chunks[i][1]
-        sig = params_chunks[i][2]
+        sig = params_chunks[i][2]/(init_params_chunks[i][2]*5.0)
         
         B_prior_width=0.5 # mJy
         lnA_prior_width=0.02 # 0.02 = 2%
@@ -2174,8 +2193,8 @@ def log_prior2(params, priors, s):
     
     
 #Probability
-def log_probability2(params, data, priors, sig_level):
-    lp = log_prior2(params, priors, len(data))
+def log_probability2(params, data, priors, sig_level, init_params_chunks):
+    lp = log_prior2(params, priors, len(data), init_params_chunks)
     if not np.isfinite(lp):
         return -np.inf
     return lp + log_likelihood2(params, data, sig_level)
@@ -2204,7 +2223,7 @@ def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter,pl
                 
         pos_chunks[i][0] = pos_chunks[i][0] + 1.0 #Set intial A to one
         pos_chunks[i][1] = pos_chunks[i][1] + 0.0 #Set initial B to zero  
-        pos_chunks[i][2] = pos_chunks[i][1] + 0.01#2 #Set initial V to 0.02   
+        pos_chunks[i][2] = np.mean(err)/5.0#2 #Set initial V to 1/5 of mean error
         
         labels_chunks[i][0] = "A"+str(i+1)
         labels_chunks[i][1] = "B"+str(i+1)        
@@ -2212,6 +2231,9 @@ def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter,pl
         
     pos_chunks[-1][0] = init_delta#Initial delta
     labels_chunks[-1][0] = "\u0394"
+    #Store initial values for use in prior
+    init_params_chunks = pos_chunks
+
     pos = list(chain.from_iterable(pos_chunks))#Flatten into single array
     labels = list(chain.from_iterable(labels_chunks))#Flatten into single array     
     
@@ -2221,13 +2243,13 @@ def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter,pl
     print(tabulate(table, headers=labels))
 
     #Define starting position
-    pos = 1e-4 * np.random.randn(int(2.0*Npar), int(Npar)) + pos
+    pos = 0.2*pos * np.random.randn(int(2.0*Npar), int(Npar)) + pos
     print("NWalkers="+str(int(2.0*Npar)))
     nwalkers, ndim = pos.shape
     with Pool() as pool:
 
         sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability2, 
-                                        args=(data, priors, sig_level), pool=pool)
+                                        args=(data, priors, sig_level, init_params_chunks), pool=pool)
         sampler.run_mcmc(pos, Nsamples, progress=True);
     
     #Extract samples with burn-in of 1000
