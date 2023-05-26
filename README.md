@@ -66,8 +66,8 @@ fit = PyROA.Fit(datadir, objName, filters, priors, add_var=True)
 Priors are uniform where the limits are specified in the following way:
 
 priors = [[A_lower, A_upper], [B_lower, B_upper], [tau_lower, tau_upper],[delta_lower, delta_upper], [sig_lower, sig_upper]]. In the above these limits are large but here is a quick rundown of what they mean:
-- The first parameter here is A, which the rms of each lightcurve (there is an A1, A2, A3 for three lightcurves) and must be positive hence some limits between 0 and some large value are appropriate. A1, A2, A3 share the same uniform prior. 
-- The next parameter, B, represents the mean of each lightcurve (there is an B1, B2, B3 for three lightcurves). 
+- The first parameter here is A, which the rms of each lightcurve (there is an A1, A2, A3 for three lightcurves). The user specified limits are fractions of the calculates rms for each raw lightcurve. This allows the true limits to be different for each lightcurve which is especially important if the scales drstically vary between lightcurves. Limits if [0.5, 2.0] should be sufficient for all use cases.
+- The next parameter, B, represents the mean of each lightcurve (there is an B1, B2, B3 for three lightcurves). This is similarly specified as a fraction of the calcualted mean of each lightcurve.  Limits if [0.5, 2.0] should be sufficient for all use cases.
 - Next, tau, is the time delay between lightcurves (here there is only tau2, tau3) and so this prior range gives the range of lags explored by the model. 
 - The next parameter delta gives the width of the window function which must be positive and non-zero. If your probability is returning nan, it may be because the lower limit on this prior is too small. 
 - The final parameter is the extra error parameter, which again is positive.
