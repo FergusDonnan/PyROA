@@ -28,6 +28,15 @@ pip install git+https://github.com/FergusDonnan/PyROA --force
 
 ## Changes
 
+### V3.2.0
+- The effective number of parameters when delay_dist=True now only uses the driving lightcurve. This has a small effect but with this change, the number of parameters only depends on the smoothness of the driving lightcurve and not the width of the delay distributions
+- Priors on the A and B (scale and shift) parameters are handled differently. The user now specifies unitless lower and upper limits as factors of the calculated RMS (A) and mean (B) of each lightcurve. This allows the prior range to vary for each lightcurve to provide more sensible limits especially in cases where the fluxes of each lightcurve vary drastically.
+- The initial values of the walkers are now setup to better sample the parameter space, now set to 0.2*initial_value. 
+- Fixed an issue where delay_dist=True did not allow negative mean lags.
+- Fixed error for the in-line output of the best-fit lags.
+
+
+
 #### v3.1.0
 - Added new utility functions (Utils.py) to analyse the outputs of PyROA. See the Utils_Tutorial for examples of usage. These include displaying lightcurve(+residuals), Convergence plots, corner and chain plots by parameter, Lag spectrum plot and Flux-Flux analysis plot.
 - Changes to the intercalibration files were added. It now outputs, for every datum the original telescope, ROA model+uncertainty at the point, and degree of freedom value.
@@ -73,8 +82,8 @@ fit = PyROA.Fit(datadir, objName, filters, priors, add_var=True)
 Priors are uniform where the limits are specified in the following way:
 
 priors = [[A_lower, A_upper], [B_lower, B_upper], [tau_lower, tau_upper],[delta_lower, delta_upper], [sig_lower, sig_upper]]. In the above these limits are large but here is a quick rundown of what they mean:
-- The first parameter here is A, which the rms of each lightcurve (there is an A1, A2, A3 for three lightcurves) and must be positive hence some limits between 0 and some large value are appropriate. A1, A2, A3 share the same uniform prior. 
-- The next parameter, B, represents the mean of each lightcurve (there is an B1, B2, B3 for three lightcurves). 
+- The first parameter here is A, which the rms of each lightcurve (there is an A1, A2, A3 for three lightcurves). The use specifies here a fraction of the calcualted rms of the raw data e.g [0.5, 2.0], which allows the prior range for each lightcurve to vary appropriately if the scales are vastly different for each lightcurve. This therefore gives different limits for A1, A2 and A3.
+- The next parameter, B, represents the mean of each lightcurve (there is an B1, B2, B3 for three lightcurves). Similarly the user specifies a fraction of the calculated mean of the raw data e.g [0.5, 2.0].
 - Next, tau, is the time delay between lightcurves (here there is only tau2, tau3) and so this prior range gives the range of lags explored by the model. 
 - The next parameter delta gives the width of the window function which must be positive and non-zero. If your probability is returning nan, it may be because the lower limit on this prior is too small. 
 - The final parameter is the extra error parameter, which again is positive.
