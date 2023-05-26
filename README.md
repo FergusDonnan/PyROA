@@ -56,7 +56,7 @@ datadir = "/MockData/HighSN/"
 objName="TestObj"
 filters=["1","2","3"]
     
-priors = [[0.0, 20.0],[0.0, 100.0], [-50.0, 50.0], [0.01, 10.0], [0.0, 10.0]]
+priors = [[0.5, 2.0],[0.5, 2.0], [-50.0, 50.0], [0.01, 10.0], [0.0, 10.0]]
 
 fit = PyROA.Fit(datadir, objName, filters, priors, add_var=True) 
 ````
