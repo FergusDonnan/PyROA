@@ -21,6 +21,9 @@ Install using pip: pip install PyROA
 
 ## Changes
 
+### v3.2.1
+ - Changed the priors in A and B expressed in units of RMS and mean to the MAD and mean. This should better handle lightcurves with lots of outliers when setting up the priors for A and B.
+
 ### v3.2.0
  - The effective number of parameters when delay_dist=True now only uses the driving lightcurve. This has a small effect but with this change, the number of parameters only depends on the smoothness of the driving lightcurve and not the width of the delay distributions
  - Priors on the A and B (scale and shift) parameters are handled differently. The user now specifies unitless lower and upper limits as factors of the calculated RMS (A) and mean (B) of each lightcurve. This allows the prior range to vary for each lightcurve to provide more sensible limits especially in cases where the fluxes of each lightcurve vary drastically.
