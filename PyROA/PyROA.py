@@ -1162,13 +1162,13 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
             t_slow, m_slow, errs_slow = RunningOptimalAverage(mjd,flux,err, slow_comp_delta)
             m_slow = m_slow - np.mean(m_slow)
             m_s = interpolate.interp1d(t_slow, m_slow, kind="linear", fill_value="extrapolate")
-            pos_chunks[i][0] = np.std(flux - m_s(mjd)) #Set intial A to rms of data
-            pos_chunks[i][1] = np.mean(flux- m_s(mjd)) #Set initial B to mean of data
+            pos_chunks[i][0] = np.median(np.absolute(flux- m_s(mjd) - np.median(flux- m_s(mjd)))) #Set intial A to rms of data
+            pos_chunks[i][1] = np.median(flux- m_s(mjd)) #Set initial B to mean of data
 
 
         else:        
-            pos_chunks[i][0] = pos_chunks[i][0] + np.std(flux)# - m_s(mjd)) #Set intial A to rms of data
-            pos_chunks[i][1] = np.mean(flux)#- m_s(mjd)) #Set initial B to mean of data
+            pos_chunks[i][0] = pos_chunks[i][0] + np.median(np.absolute(flux - np.median(flux)))# - m_s(mjd)) #Set intial A to rms of data
+            pos_chunks[i][1] = np.median(flux)#- m_s(mjd)) #Set initial B to mean of data
             
 
             
