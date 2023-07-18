@@ -21,6 +21,9 @@ Install using pip: pip install PyROA
 
 ## Changes
 
+### v3.2.2
+ - Fixed issue with initialising walkers
+
 ### v3.2.1
  - Changed the priors in A and B expressed in units of RMS and mean to the MAD and median. This should better handle lightcurves with lots of outliers when setting up the priors for A and B.
 
