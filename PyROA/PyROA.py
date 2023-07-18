@@ -1300,7 +1300,8 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
 
     #Define starting position
     
-    pos = 0.2*pos* np.random.randn(int(2.0*Npar), int(Npar - param_delete)) + pos
+    pos = 0.2*np.array(pos)* np.random.randn(int(2.0*Npar), int(Npar - param_delete)) + np.array(pos) + 1e-4* np.random.randn(int(2.0*Npar), int(Npar - param_delete)) 
+
 
     nwalkers, ndim = pos.shape
     print("NWalkers="+str(int(2.0*Npar)))
@@ -2239,11 +2240,11 @@ def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter,pl
     
 
     print("Initial Parameter Values")
-    table = [pos]
+    table =[pos]
     print(tabulate(table, headers=labels))
 
     #Define starting position
-    pos = 0.2*pos * np.random.randn(int(2.0*Npar), int(Npar)) + pos
+    pos = 0.2*np.array(pos)* np.random.randn(int(2.0*Npar), int(Npar)) + np.array(pos) + 1e-4* np.random.randn(int(2.0*Npar), int(Npar)) 
     print("NWalkers="+str(int(2.0*Npar)))
     nwalkers, ndim = pos.shape
     with Pool() as pool:
@@ -2899,7 +2900,9 @@ def LensFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
     print(tabulate(table, headers=labels))
 
     #Define starting position
-    pos = 1e-4 * np.random.randn(int(2.0*Npar), Npar - 6) + pos
+    #pos = 1e-4 * np.random.randn(int(2.0*Npar), Npar - 6) + pos
+    pos = 0.2*np.array(pos)* np.random.randn(int(2.0*Npar), int(Npar - 6)) + np.array(pos) + 1e-4* np.random.randn(int(2.0*Npar), int(Npar - 6)) 
+
     nwalkers, ndim = pos.shape
     
     print("Nwalkers = ", nwalkers)  
