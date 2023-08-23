@@ -2168,7 +2168,10 @@ def log_prior2(params, priors, s, init_params_chunks):
     for i in range(s):
         A = params_chunks[i][0]
         B = params_chunks[i][1]
-        sig = params_chunks[i][2]/(init_params_chunks[i][2]*5.0)
+        sig = params_chunks[i][2]
+        # Removed the /(init_params_chunks[i][2]*5.0) as we don't understand
+        # its origin and believe its wrong. NEEDS CHECKING!
+        #sig = params_chunks[i][2]/(init_params_chunks[i][2]*5.0)
         
         B_prior_width=0.5 # mJy
         lnA_prior_width=0.02 # 0.02 = 2%
@@ -2217,6 +2220,9 @@ def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter,pl
     labels = [None]*(3*len(data) + 1)
     pos_chunks = [pos[i:i + 3] for i in range(0, len(pos), 3)]
     labels_chunks = [labels[i:i + 3] for i in range(0, len(labels), 3)]
+    pos_min = [pos[i:i + 3] for i in range(0, len(pos), 3)]
+    pos_max = [pos[i:i + 3] for i in range(0, len(pos), 3)]
+    
     for i in range(len(data)):
         mjd = data[i][:,0]
         flux = data[i][:,1]
@@ -2229,7 +2235,19 @@ def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter,pl
         labels_chunks[i][0] = "A"+str(i+1)
         labels_chunks[i][1] = "B"+str(i+1)        
         labels_chunks[i][2] = "\u03C3"+str(i+1)                
-        
+
+        # New lower and maximum values for the priors
+        pos_min[i][0] = 0.0
+        pos_min[i][1] = -0.5*10
+        pos_min[i][2] = priors[1][0]
+
+        pos_min[i][0] = 2.0
+        pos_min[i][1] = 0.5*10
+        pos_min[i][2] = priors[1][1]
+
+    pos_min[-1][0] = priors[0][0]
+    pos_max[-1][0] = priors[0][1]
+    
     pos_chunks[-1][0] = init_delta#Initial delta
     labels_chunks[-1][0] = "\u0394"
     #Store initial values for use in prior
@@ -2237,16 +2255,27 @@ def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter,pl
 
     pos = list(chain.from_iterable(pos_chunks))#Flatten into single array
     labels = list(chain.from_iterable(labels_chunks))#Flatten into single array     
-    
 
+    pos_min = list(chain.from_iterable(pos_min))#Flatten into single array
+    pos_max = list(chain.from_iterable(pos_max))#Flatten into single array
+
+    print('JVHS min/max walker positions')
+    
     print("Initial Parameter Values")
     table =[pos]
     print(tabulate(table, headers=labels))
 
     #Define starting position
-    pos = 0.2*np.array(pos)* np.random.randn(int(2.0*Npar), int(Npar)) + np.array(pos) + 1e-4* np.random.randn(int(2.0*Npar), int(Npar)) 
+    #pos = 0.2*np.array(pos)* np.random.randn(int(2.0*Npar), int(Npar)) + np.array(pos) + 1e-4* np.random.randn(int(2.0*Npar), int(Npar)) 
+
     print("NWalkers="+str(int(2.0*Npar)))
     nwalkers, ndim = pos.shape
+    
+    # New starting positions
+    psize = pos_max - pos_min
+    pos = [pos_min + psize*np.random.rand(ndim) for i in range(nwalkers)]
+
+    
     with Pool() as pool:
 
         sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability2, 
