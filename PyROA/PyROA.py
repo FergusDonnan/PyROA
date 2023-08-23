@@ -2241,9 +2241,9 @@ def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter,pl
         pos_min[i][1] = -0.5*10
         pos_min[i][2] = priors[1][0]
 
-        pos_min[i][0] = 2.0
-        pos_min[i][1] = 0.5*10
-        pos_min[i][2] = priors[1][1]
+        pos_max[i][0] = 2.0
+        pos_max[i][1] = 0.5*10
+        pos_max[i][2] = priors[1][1]
 
     pos_min[-1][0] = priors[0][0]
     pos_max[-1][0] = priors[0][1]
@@ -2256,11 +2256,9 @@ def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter,pl
     pos = list(chain.from_iterable(pos_chunks))#Flatten into single array
     labels = list(chain.from_iterable(labels_chunks))#Flatten into single array     
 
-    pos_min = list(chain.from_iterable(pos_min))#Flatten into single array
-    pos_max = list(chain.from_iterable(pos_max))#Flatten into single array
+    pos_min = np.array(list(chain.from_iterable(pos_min)))#Flatten into single array
+    pos_max = np.array(list(chain.from_iterable(pos_max)))#Flatten into single array
 
-    print('JVHS min/max walker positions')
-    
     print("Initial Parameter Values")
     table =[pos]
     print(tabulate(table, headers=labels))
@@ -2269,18 +2267,23 @@ def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter,pl
     #pos = 0.2*np.array(pos)* np.random.randn(int(2.0*Npar), int(Npar)) + np.array(pos) + 1e-4* np.random.randn(int(2.0*Npar), int(Npar)) 
 
     print("NWalkers="+str(int(2.0*Npar)))
-    nwalkers, ndim = pos.shape
+    print(np.random.rand(Npar))
+
     
     # New starting positions
     psize = pos_max - pos_min
-    pos = [pos_min + psize*np.random.rand(ndim) for i in range(nwalkers)]
+    new_pos = [pos_min + psize*np.random.rand(Npar) for i in range(2*Npar)]
+    new_pos = np.array(new_pos)
 
+    #print(np.array(new_pos))
+    np.savetxt('test_initial_points.txt',new_pos.T)
+    nwalkers, ndim = new_pos.shape
     
     with Pool() as pool:
 
         sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability2, 
                                         args=(data, priors, sig_level, init_params_chunks), pool=pool)
-        sampler.run_mcmc(pos, Nsamples, progress=True);
+        sampler.run_mcmc(new_pos, Nsamples, progress=True);
     
     #Extract samples with burn-in of 1000
     samples_flat = sampler.get_chain(discard=Nburnin, thin=15, flat=True)
@@ -2413,7 +2416,7 @@ def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter,pl
 
 
 class InterCalibrate():
-    def __init__(self, datadir, objName, filter, scopes, priors, init_delta=1.0, sig_level = 4.0,
+    def __init__(self, datadir, objName, filter, scopes, priors, init_delta=1.0, sig_level = 3.0,
                  Nsamples=15000, Nburnin=10000,plot_corner=False):
         self.datadir=datadir
         self.objName=objName
