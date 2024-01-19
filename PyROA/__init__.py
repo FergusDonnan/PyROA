@@ -4,4 +4,4 @@ __modules__ = ['PyROA']
 from .PyROA import Fit, InterCalibrate, GravLensFit, Plot, RunningOptimalAverage
 from .Utils import Chains, Lightcurves, FluxFlux, LagSpectrum, CornerPlot, Convergence
 
-__version__ = "3.2.0"
+__version__ = "3.3.0"
