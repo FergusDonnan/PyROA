@@ -157,7 +157,7 @@ def Chains(nparam,filters,delay_ref,
 
 	
 	if savefig:
-        if figname == None: figname = 'pyroa_corner.pdf'
+        	if figname == None: figname = 'pyroa_corner.pdf'
 		plt.savefig(figname)
 
 def CornerPlot(nparam,filters,delay_ref,
