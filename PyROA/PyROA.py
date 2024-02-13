@@ -1370,12 +1370,12 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
     # New starting positions
     psize = pos_max - pos_min
 
-    new_pos = [pos_min + psize*np.random.rand(int(Npar - param_delete)) for i in range(2*(Npar-param_delete))]
-    new_pos = np.array(new_pos)
+    pos = [pos_min + psize*np.random.rand(int(Npar - param_delete)) for i in range(2*(Npar-param_delete))]
+    pos = np.array(pos)
 
-    #print(np.array(new_pos))
-    np.savetxt('test_initial_points.txt',new_pos.T)
-    nwalkers, ndim = new_pos.shape
+    #print(np.array(pos))
+    np.savetxt('test_initial_points.txt',pos.T)
+    nwalkers, ndim = pos.shape
     #Backend
     if (use_backend == True):
         filename = "Fit.h5"
@@ -1391,7 +1391,7 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
         sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability, args=[data, priors, add_var, size,sig_level, include_slow_comp, 
                                         slow_comp_delta, P_func, slow_comps, P_slow, init_delta, delay_dist, psi_types, 
                                         pos_ref, AccDisc, wavelengths, integral, integral2, init_params_chunks,memfunction], pool=pool, backend=backend)
-        sampler.run_mcmc(new_pos, Nsamples, progress=True);
+        sampler.run_mcmc(pos, Nsamples, progress=True);
 
     #Extract samples with burn-in of 1000
     samples_flat = sampler.get_chain(discard=Nburnin, thin=15, flat=True)
@@ -2404,18 +2404,18 @@ def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter,pl
     
     # New starting positions
     psize = pos_max - pos_min
-    new_pos = [pos_min + psize*np.random.rand(Npar) for i in range(2*Npar)]
-    new_pos = np.array(new_pos)
+    pos = [pos_min + psize*np.random.rand(Npar) for i in range(2*Npar)]
+    pos = np.array(pos)
 
-    #print(np.array(new_pos))
-    np.savetxt('test_initial_points.txt',new_pos.T)
-    nwalkers, ndim = new_pos.shape
+    #print(np.array(pos))
+    np.savetxt('test_initial_points.txt',pos.T)
+    nwalkers, ndim = pos.shape
     
     with Pool() as pool:
 
         sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability2, 
                                         args=(data, priors, sig_level, init_params_chunks,memfunction), pool=pool)
-        sampler.run_mcmc(new_pos, Nsamples, progress=True);
+        sampler.run_mcmc(pos, Nsamples, progress=True);
     
     #Extract samples with burn-in of 1000
     samples_flat = sampler.get_chain(discard=Nburnin, thin=15, flat=True)
