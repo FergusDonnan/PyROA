@@ -156,7 +156,7 @@ def AccDisc(l_0, l, T1, b,integral,t, min_delay, conv):
 
 
 @jit(nopython=True, cache=False, parallel=False)
-def CalculatePorc(t_data, Flux, Flux_err, delta, memfunction):
+def CalculatePorc(t_data, Flux, Flux_err, delta, memfunction = 'gaussian'):
 
     Ps = np.empty(len(t_data))
     for i in prange(len(t_data)):
@@ -219,7 +219,7 @@ def CalculatePorc(t_data, Flux, Flux_err, delta, memfunction):
 
 
 @jit(nopython=True, cache=False, parallel=False)
-def RunningOptimalAverage(t_data, Flux, Flux_err, delta,memfunction):
+def RunningOptimalAverage(t_data, Flux, Flux_err, delta,memfunction, gridsize):
     #Inputs
     # Flux : Array of data values
     # Flux_err : Array containig errors of data values
@@ -231,8 +231,8 @@ def RunningOptimalAverage(t_data, Flux, Flux_err, delta,memfunction):
     # t : List of model times 
     # model : List of model fluxes calculated from running optimal average
 
-
-    gridsize=1000
+    #cutom gridsize added 29th August 2024
+    #gridsize=1000
 
     
     mx=max(t_data)
@@ -670,7 +670,7 @@ def integrand2(x, b):
     
 #BIC
 def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delta, P_func, slow_comps,
-        P_slow, init_delta, delay_dist, psi_types, pos_ref, AccDisc, wavelengths, integral, integral2, memfunction):
+        P_slow, init_delta, delay_dist, psi_types, pos_ref, AccDisc, wavelengths, integral, integral2, memfunction, gridsize):
 
     Nchunk = 2
     if (AccDisc == False):
@@ -795,7 +795,7 @@ def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delt
     #Calculate ROA to merged lc
     if (delay_dist == False and AccDisc == False):
 
-        t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta,memfunction)
+        t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta,memfunction, gridsize)
         
         #Normalise lightcurve
 
@@ -916,8 +916,14 @@ def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delt
                 ex_term[j] = np.log(((err[j]**2)/(data[i][j,2]**2)))  
                               
             else:
-                chi2[j] =sig_level**2
-                ex_term[j] = np.log(((abs(model[j] - flux[j])/sig_level)**2)/(data[i][j,2]**2))
+                #linear sigma clip
+                chi2[j] = (2 * sig_level / err[j]) * abs(model[j] - flux[j]) - sig_level**2
+                ex_term[j] = np.log(abs(model[j] - flux[j])**2 / chi2[j] / data[i][j,2]**2)
+                
+                #constant sigma clip
+                #chi2[j] =sig_level**2
+                #ex_term[j] = np.log(((abs(model[j] - flux[j])/sig_level)**2)/(data[i][j,2]**2))
+        
         lps[i]=np.sum(chi2 + ex_term) 
     
     lprob = np.sum(lps)  
@@ -1078,7 +1084,7 @@ def log_prior(params, priors, add_var, data, delay_dist, AccDisc, wavelengths, i
 #Probability
 def log_probability(params, data, priors, add_var, size, sig_level, include_slow_comp, slow_comp_delta,P_func, 
                     slow_comps, P_slow, init_delta, delay_dist, psi_types, pos_ref, AccDisc, wavelengths, integral, integral2, init_params_chunks,
-                    memfunction):
+                    memfunction, gridsize):
 
 
         
@@ -1113,7 +1119,7 @@ def log_probability(params, data, priors, add_var, size, sig_level, include_slow
     if not np.isfinite(lp):
         return -np.inf
     return lp - BIC(params, data, add_var, size, sig_level, include_slow_comp, slow_comp_delta,P_func, slow_comps, P_slow, 
-                    init_delta, delay_dist,psi_types, pos_ref, AccDisc, wavelengths, integral, integral2,memfunction)
+                    init_delta, delay_dist,psi_types, pos_ref, AccDisc, wavelengths, integral, integral2,memfunction, gridsize)
 
     
     
@@ -1131,7 +1137,7 @@ def Slow(t, S0, dS, t0):
 def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, 
             Nburnin, include_slow_comp, slow_comp_delta, calc_P, delay_dist,
             psi_types, pos_ref, AccDisc, wavelengths, filters, use_backend, 
-            resume_progress, plot_corner,memfunction):
+            resume_progress, plot_corner,memfunction, gridsize):
 
     
     Nchunk = 2
@@ -1185,7 +1191,7 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
         sizes[i+1] = len(mjd)   
      
         if (include_slow_comp==True):
-            t_slow, m_slow, errs_slow = RunningOptimalAverage(mjd,flux,err, slow_comp_delta,memfunction)
+            t_slow, m_slow, errs_slow = RunningOptimalAverage(mjd,flux,err, slow_comp_delta,memfunction, gridsize)
             m_slow = m_slow - np.mean(m_slow)
             m_s = interpolate.interp1d(t_slow, m_slow, kind="linear", fill_value="extrapolate")
             pos_chunks[i][0] = np.median(np.absolute(flux- m_s(mjd) - np.median(flux- m_s(mjd)))) #Set intial A to rms of data
@@ -1264,11 +1270,11 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
     slow_comps =[]                    
     if (include_slow_comp==True):
         for i in range(len(data)):
-            t_sl, m_sl, errs_sl = RunningOptimalAverage(data[i][:,0], data[i][:,1], data[i][:,2], slow_comp_delta,memfunction)
+            t_sl, m_sl, errs_sl = RunningOptimalAverage(data[i][:,0], data[i][:,1], data[i][:,2], slow_comp_delta,memfunction, gridsize)
             
             #params, pcov = scipy.optimize.curve_fit(Slow, data[i][:,0], data[i][:,1], p0=[4., -1.0, 59300] ,sigma=data[i][:,2], absolute_sigma=False)
            # perr = np.sqrt(np.diag(pcov))        
-            t_sl=np.linspace(min(data[i][:,0]), max(data[i][:,0]), 1000)
+            t_sl=np.linspace(min(data[i][:,0]), max(data[i][:,0]), gridsize)
             #m_sl = Slow(t_sl, params[0], params[1],params[2])
             #errs_sl = np.zeros(1000)
             #m_sl = Slow(np.linspace(59100, 59500, 1000), params[0], params[1],params[2]) - np.mean(m_sl)            
@@ -1331,7 +1337,7 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
         pos_max = np.delete(pos_max, pos_rem) 
         
 
-    if (delay_dist==True and AccDisc == False):
+    if (delay_dist == True and AccDisc == False):
         if (pos_ref == 0):
             pos = np.delete(pos, [2]) 
             labels = np.delete(labels, [2])
@@ -1369,8 +1375,15 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
     
     # New starting positions
     psize = pos_max - pos_min
+    
+    print('psize: ', psize)
+    #print('pos_min: ', pos_min)
+    #print('param_delete: ', param_delete)
+    #print('Npar: ', Npar)
+    #print('int(Npar - param_delete)', int(Npar - param_delete))
+    
 
-    pos = [pos_min + psize*np.random.rand(int(Npar - param_delete)) for i in range(2*(Npar-param_delete))]
+    pos = [pos_min + psize*np.random.rand(int(Npar - param_delete)) for i in range(2*((Npar-param_delete)))]
     pos = np.array(pos)
 
     #print(np.array(pos))
@@ -1390,7 +1403,7 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
 
         sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability, args=[data, priors, add_var, size,sig_level, include_slow_comp, 
                                         slow_comp_delta, P_func, slow_comps, P_slow, init_delta, delay_dist, psi_types, 
-                                        pos_ref, AccDisc, wavelengths, integral, integral2, init_params_chunks,memfunction], pool=pool, backend=backend)
+                                        pos_ref, AccDisc, wavelengths, integral, integral2, init_params_chunks,memfunction, gridsize], pool=pool, backend=backend)
         sampler.run_mcmc(pos, Nsamples, progress=True);
 
     #Extract samples with burn-in of 1000
@@ -1566,7 +1579,7 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
     if (delay_dist == False and AccDisc == False):
     
 
-        t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta,memfunction)
+        t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta,memfunction, gridsize)
 
     
     
@@ -1653,7 +1666,7 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
             mx=max(merged_mjd)
             mn=min(merged_mjd)
             length = abs(mx-mn)
-            t = np.arange(mn, mx, length/(1000)) 
+            t = np.arange(mn, mx, length/(gridsize)) 
 
             
             ts, Xs, errss = RunningOptimalAverageOutConv(t, merged_mjd, merged_flux, merged_err, factors, conv, prev, x, delta_new)
@@ -1800,12 +1813,13 @@ class Fit():
                  delay_dist=False , psi_types = None, add_var=True, sig_level = 4.0, 
                  Nsamples=10000, Nburnin=0, include_slow_comp=False, slow_comp_delta=30.0, 
                  calc_P=False, AccDisc=False, wavelengths=None, 
-                 use_backend = False, resume_progress = False, plot_corner=False,memfunction='gaussian'):
+                 use_backend = False, resume_progress = False, plot_corner=False,memfunction='gaussian', gridsize = None):
         
         if datadir[-1] != '/': datadir += '/'  #Add forward slash in case it isn't there
         self.datadir=datadir
         self.objName=objName
         self.filters=filters
+        self.gridsize = gridsize
         data=[]
         for i in range(len(filters)):
             file = datadir + str(self.objName) +"_"+ str(self.filters[i]) + ".dat"
@@ -1873,7 +1887,7 @@ class Fit():
                       self.sig_level, self.Nsamples, self.Nburnin, self.include_slow_comp, 
                       self.slow_comp_delta, self.calc_P, self.delay_dist, self.psi_types, 
                       self.delay_ref_pos, self.AccDisc, self.wavelengths, self.filters, 
-                      self.use_backend, self.resume_progress,plot_corner,memfunction)
+                      self.use_backend, self.resume_progress,plot_corner,memfunction, self.gridsize)
 
         self.samples = run[0]
         self.samples_flat = run[1]
@@ -2170,7 +2184,7 @@ def Plot(Fit):
         
         
 #Log Likelihood
-def log_likelihood2(params, data, sig_level,memfunction):
+def log_likelihood2(params, data, sig_level,memfunction, gridsize):
 
     #Break params list into chunks of 3 i.e A, B, V in each chunk
     params_chunks = [params[i:i + 3] for i in range(0, len(params), 3)] 
@@ -2215,7 +2229,7 @@ def log_likelihood2(params, data, sig_level,memfunction):
 
     
     #Calculate ROA to merged lc
-    t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta,memfunction)
+    t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta,memfunction, gridsize)
     P=CalculateP(merged_mjd, merged_flux, merged_err, delta,memfunction)
 
     
@@ -2329,11 +2343,11 @@ def log_prior2(params, priors, s, init_params_chunks):
     
     
 #Probability
-def log_probability2(params, data, priors, sig_level, init_params_chunks,memfunction):
+def log_probability2(params, data, priors, sig_level, init_params_chunks,memfunction, gridsize):
     lp = log_prior2(params, priors, len(data), init_params_chunks)
     if not np.isfinite(lp):
         return -np.inf
-    return lp + log_likelihood2(params, data, sig_level,memfunction)
+    return lp + log_likelihood2(params, data, sig_level,memfunction, gridsize)
     
     
     
@@ -2341,7 +2355,7 @@ def log_probability2(params, data, priors, sig_level, init_params_chunks,memfunc
 
 
 
-def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter,plot_corner,memfunction):
+def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter,plot_corner,memfunction, gridsize):
 
     ########################################################################################    
     #Run MCMC to fit to data
@@ -2414,7 +2428,7 @@ def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter,pl
     with Pool() as pool:
 
         sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability2, 
-                                        args=(data, priors, sig_level, init_params_chunks,memfunction), pool=pool)
+                                        args=(data, priors, sig_level, init_params_chunks,memfunction, gridsize), pool=pool)
         sampler.run_mcmc(pos, Nsamples, progress=True);
     
     #Extract samples with burn-in of 1000
@@ -2471,7 +2485,7 @@ def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter,pl
     params.append([delta])
     params = list(chain.from_iterable(params))#Flatten into single array
     #Calculate ROA to merged lc
-    t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta,memfunction)
+    t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta,memfunction, gridsize)
     
     Calibrated_mjd = []
     Calibrated_flux = []
@@ -2769,7 +2783,7 @@ def log_likelihood3(params, data, add_var, size, sig_level):
 
     
     #Calculate ROA to merged lc
-    t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta,memfunction)
+    t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta,memfunction, gridsize)
     P=CalculateP(merged_mjd, merged_flux, merged_err, delta, memfunction)
 
 
@@ -2987,7 +3001,7 @@ def LensFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
         #Find initial polynomial coeff.
         
         
-        t,m,errs = RunningOptimalAverage(data[0][:,0], data[0][:,1], data[0][:,2], init_delta, memfunction)
+        t,m,errs = RunningOptimalAverage(data[0][:,0], data[0][:,1], data[0][:,2], init_delta, memfunction, gridsize)
         t_shifted = t + init_tau[i]
         interp = interpolate.interp1d(t_shifted, m, kind="linear", fill_value="extrapolate")
         m1 = interp(mjd)    
@@ -3171,11 +3185,11 @@ def LensFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
     params=np.delete(params, [0,1, 2, 3, 4, 5])    
 
     #Calculate ROA to merged lc
-    t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta,memfunction)
+    t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta,memfunction, gridsize)
     #Normalise lightcurve
     m_mean = np.mean(m)#np.average(m, weights = 1.0/(errs**2))
     m_rms = np.std(m)
-    t, m, errs = RunningOptimalAverageOutp(merged_mjd, merged_flux, merged_err, delta,memfunction)
+    t, m, errs = RunningOptimalAverageOutp(merged_mjd, merged_flux, merged_err, delta,memfunction, gridsize)
     m = (m-m_mean)/m_rms
     errs = errs/m_rms
     #Remove first tau
@@ -3412,12 +3426,4 @@ class GravLensFit():
             i += 1
         fig.savefig('{}{:d}.pdf'.format("GravLensPlot", i))
         #plt.close()      
-        
-        
-        
-        
-        
-        
-        
-        
         
