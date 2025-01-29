@@ -234,7 +234,8 @@ def RunningOptimalAverage(t_data, Flux, Flux_err, delta,memfunction, gridsize):
     #cutom gridsize added 29th August 2024
     #gridsize=1000
 
-    
+    if gridsize == None: gridsize=1000
+        
     mx=max(t_data)
     mn=min(t_data)
     length = abs(mx-mn)
