@@ -561,6 +561,12 @@ def Lightcurves(objName, filters, delay_ref,
 	        #filto = filters[i]
 	        filto = filter_labels[i]
 	        #if filters[i] =='g1': filto = 'g'
+		# Catch infinite errorbars	        
+	        inf_mask  = errs == np.inf	        
+		errs[inf_mask] = 1e32
+	        inf_mask  = errs == -np.inf
+	        errs[inf_mask] = -1e32
+		
 	        ax1.text(0.1,0.2,filto, color=band_colors[i], fontsize=19, transform=ax1.transAxes)
 	        ax1.fill_between(t, m+errs, m-errs, alpha=0.5, color="black")
 	        #ax1.set_xlabel("Time")
@@ -621,6 +627,11 @@ def Lightcurves(objName, filters, delay_ref,
 	            #filto = filters[i]
 	            filto = filter_labels[i]
 	            #if filters[i] =='g1': filto = 'g'
+		    # Catch infinite errorbars	        
+	            inf_mask  = errs == np.inf	        
+		    errs[inf_mask] = 1e32
+	            inf_mask  = errs == -np.inf
+	            errs[inf_mask] = -1e32
 	            ax1.text(0.1,0.2,filto, color=band_colors[i], fontsize=19, transform=ax1.transAxes)
 	            ax1.fill_between(t, m+errs, m-errs, alpha=0.5, color="black")
 	            #ax1.set_xlabel("Time")
