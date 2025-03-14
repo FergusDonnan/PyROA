@@ -563,7 +563,7 @@ def Lightcurves(objName, filters, delay_ref,
 	        #if filters[i] =='g1': filto = 'g'
 		# Catch infinite errorbars	        
 	        inf_mask  = errs == np.inf	        
-		errs[inf_mask] = 1e32
+	        errs[inf_mask] = 1e32
 	        inf_mask  = errs == -np.inf
 	        errs[inf_mask] = -1e32
 		
