@@ -155,8 +155,7 @@ def Chains(nparam,filters,delay_ref,
 			
 		ax.set_xlabel("Chain number")
 	if savefig:
-        	if figname == None: 
-			figname = 'pyroa_corner.pdf'
+        	if figname == None: figname = 'pyroa_corner.pdf'
 		plt.savefig(figname)
 
 def CornerPlot(nparam,filters,delay_ref,
