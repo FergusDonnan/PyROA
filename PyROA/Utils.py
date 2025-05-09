@@ -12,13 +12,60 @@ import astropy.constants as ct
 from pandas import DataFrame
 
 def Chains(nparam,filters,delay_ref,
-				outputdir = './',
-				samples_file='samples_flat.obj',
-                initial=0,burnin=0,
-                savefig=True):
+				burnin=0, samples_file='samples_flat.obj',
+                outputdir = './', initial=0,
+                savefig=True,figname=None):
+	"""Parameter Chain Plot of MCMC from PyROA outputs
+	nparam : str
+		Parameters to show in the corner plot. Can choose
+		individual ones such as: 'A','B','tau','sig'
+		or plot all parameters: 'all'
+		(NOTE, the latter can create very large files)
+    filters : list
+        List of filters used in the PyROA fit.
+    delay_ref : str
+        Name of the filter used as the reference. Must be contained in
+        "filters".
+
+
+	burnin : float, optional
+        Number of samples to discard in the fit, from 0 to burnin.
+        This cut is applied to the samples_flat.obj.
+        Use the "convergence" or "chains" plots to determine this 
+        number.  Default: 0
+    samples_file : str, optional
+        File name of the MCMC samples. Default: "samples_flat.obj"
+        This is the PyROA standard output.
+    outputdir : str, optional
+        Directory path where PyROA "*.obj" are stored. 
+        This is the PyROA standard output. Default: Current directory "./"
+    initial : int, optional
+        Initial chain number to discard. Default: 0
+    savefig : bool, optional
+        Save figure as a PDF Default: True.
+    figname : str, optional
+        Name of the figure to be saved. If not provided, the default
+        name is 'pyroa_chains.pdf'
+
+
+    Returns
+    -------
+    None
+
+    Example
+    -------
+	import pyroa_utils
+	
+	importlib.reload(utils)
+	filters=['u','B','g']
+	burnin = 250000
+	delay_ref = 'g'
+    # Plot chain for the delay "tau" parameters
+	pyroa_utils.Chains('tau',filters,delay_ref,
+	                  burnin=burnin)
+
 	"""
-	Plot each parameter
-	"""
+
 	if outputdir[-1] != '/': outputdir += '/'
 
 	file = open(outputdir+samples_file,'rb')
@@ -107,10 +154,9 @@ def Chains(nparam,filters,delay_ref,
 		ax.yaxis.set_label_coords(-0.1, 0.5)
 			
 		ax.set_xlabel("Chain number")
-
-	
-	if savefig:
-		plt.savefig('pyroa_chains.pdf')
+	if savefig:		
+		if figname == None: figname = 'pyroa_corner.pdf'
+		plt.savefig(figname)
 
 def CornerPlot(nparam,filters,delay_ref,
 				burnin=0,
@@ -325,11 +371,14 @@ def LagSpectrum(filters,delay_ref,wavelengths,
 def Lightcurves(objName, filters, delay_ref, 
 				lc_file="Lightcurve_models.obj",
 				samples_file='samples_flat.obj',
+				slow_comp_file='Slow_Comps.obj',
 				outputdir = './', datadir='./',
 				burnin=0, band_colors = None,
 				limits=None, grid=False, grid_step=5.0,
 				show_delay_ref=False, ylab = None,
-				filter_labels = None, savefig=True, figname=None):
+				filter_labels = None, savefig=True, figname=None,
+				include_slow_comp=False,slow_comp_delta=30.0
+				):
 	"""Plots the Lightcurve data and best fit as measured by PyROA
 
     Parameters
@@ -415,6 +464,10 @@ def Lightcurves(objName, filters, delay_ref,
 	file = open(outputdir+lc_file,'rb')
 	models = pickle.load(file)
 
+	if include_slow_comp:
+		file = open(outputdir+slow_comp_file,'rb')
+		slow_comps = pickle.load(file)
+
 
 	#Split samples into chunks, 4 per lightcurve i.e A, B, tau, sig
 	chunk_size=4
@@ -458,6 +511,7 @@ def Lightcurves(objName, filters, delay_ref,
 	    	xmin = np.nanmin(mjd)-10
 	    	xmax = np.nanmax(mjd)+10
 	    #Add extra variance
+	    B = np.percentile(samples_chunks[i][1], 50)
 	    sig = np.percentile(samples_chunks[i][3], 50)
 	    err = np.sqrt(err**2 + sig**2)
 
@@ -470,6 +524,7 @@ def Lightcurves(objName, filters, delay_ref,
 	        ax2 = fig.add_subplot(gs00[-2:, :])
 	        
 	        ax1.set_ylim(np.median(flux)-4.8*mad(flux),np.median(flux)+4.8*mad(flux))
+	        #ax1.set_ylim(0,50)
 	        #ax2.set_yticklabels([])
 	        if i < len(filters)-1:
 	            
@@ -497,9 +552,20 @@ def Lightcurves(objName, filters, delay_ref,
 	        ax1.set_xlim(xmin,xmax)
 	        
 	        ax1.plot(t,m, color="black", lw=3)
+
+	        if (include_slow_comp == True):
+	            slow_comp = slow_comps[i]
+	            
+	            ax1.plot(mjd, slow_comp(mjd)+B, linestyle="dashed", color="black")   
 	        #filto = filters[i]
 	        filto = filter_labels[i]
 	        #if filters[i] =='g1': filto = 'g'
+		# Catch infinite errorbars	        
+	        inf_mask  = errs == np.inf	        
+	        errs[inf_mask] = 1e32
+	        inf_mask  = errs == -np.inf
+	        errs[inf_mask] = -1e32
+		
 	        ax1.text(0.1,0.2,filto, color=band_colors[i], fontsize=19, transform=ax1.transAxes)
 	        ax1.fill_between(t, m+errs, m-errs, alpha=0.5, color="black")
 	        #ax1.set_xlabel("Time")
@@ -560,6 +626,11 @@ def Lightcurves(objName, filters, delay_ref,
 	            #filto = filters[i]
 	            filto = filter_labels[i]
 	            #if filters[i] =='g1': filto = 'g'
+		    # Catch infinite errorbars	        
+	            inf_mask  = errs == np.inf	        
+	            errs[inf_mask] = 1e32
+	            inf_mask  = errs == -np.inf
+	            errs[inf_mask] = -1e32
 	            ax1.text(0.1,0.2,filto, color=band_colors[i], fontsize=19, transform=ax1.transAxes)
 	            ax1.fill_between(t, m+errs, m-errs, alpha=0.5, color="black")
 	            #ax1.set_xlabel("Time")

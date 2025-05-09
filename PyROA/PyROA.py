@@ -155,8 +155,8 @@ def AccDisc(l_0, l, T1, b,integral,t, min_delay, conv):
 
 
 
-@jit(nopython=True, cache=True, parallel=True)
-def CalculatePorc(t_data, Flux, Flux_err, delta):
+@jit(nopython=True, cache=False, parallel=False)
+def CalculatePorc(t_data, Flux, Flux_err, delta, memfunction = 'gaussian'):
 
     Ps = np.empty(len(t_data))
     for i in prange(len(t_data)):
@@ -169,32 +169,41 @@ def CalculatePorc(t_data, Flux, Flux_err, delta):
         
         if (len(np.where(np.absolute(t_data[i]-t_data) < 5.0*delta)[0])==0):
             #Define Gaussian Memory Function
-            w =np.exp(-0.5*(((t_data[i]-t_data)/delta)**2))/(Flux_err**2)
+            if memfunction == 'gaussian':
+                w =np.exp(-0.5*(((t_data[i]-t_data)/delta)**2))/(Flux_err**2)
 
             #1/cosh Memory function
-            #w = 1.0/((Flux_err**2)*np.cosh((t_data[i]-t_data)/delta))
+            if memfunction == 'invcosh':
+                w = 1.0/((Flux_err**2)*np.cosh((t_data[i]-t_data)/delta))
 
             #Lorentzian
-           # w = 1.0/((Flux_err**2)*(1.0+((t_data[i]-t_data)/delta)**2))
+            if memfunction == 'lorentzian':
+                w = 1.0/((Flux_err**2)*(1.0+((t_data[i]-t_data)/delta)**2))
            
-           #Boxcar
-            #w=np.full(len(Flux_err), 0.01)
+            #Boxcar
+            if memfunction == 'boxcar':
+                w = np.full(len(Flux_err), 0.01)
 
             
             
         else:
         
             #Define Gaussian Memory Function
-            w =np.exp(-0.5*(((t_data[i]-t_data_use)/delta)**2))/(Flux_err_use**2)
+            if memfunction == 'gaussian':
+                w =np.exp(-0.5*(((t_data[i]-t_data_use)/delta)**2))/(Flux_err_use**2)
 
             #1/cosh Memory function
-            #w = 1.0/((Flux_err_use**2)*np.cosh((t_data[i]-t_data_use)/delta))
+            if memfunction == 'invcosh':
+                w = 1.0/((Flux_err_use**2)*np.cosh((t_data[i]-t_data_use)/delta))
 
             #Lorentzian
-            #w = 1.0/((Flux_err_use**2)*(1.0+((t_data[i]-t_data_use)/delta)**2))
+            if memfunction == 'lorentzian':
+                w = 1.0/((Flux_err_use**2)*(1.0+((t_data[i]-t_data_use)/delta)**2))
             
             #Boxcar
-            #w=1.0/(Flux_err_use**2)
+            if memfunction == 'boxcar':
+                w = 1.0/(Flux_err_use**2)
+
         w_sum = np.nansum(w)
 
         #P= P + 1.0/((Flux_err[i]**2)*np.nansum(w))
@@ -209,8 +218,8 @@ def CalculatePorc(t_data, Flux, Flux_err, delta):
 
 
 
-@jit(nopython=True, cache=True, parallel=True)
-def RunningOptimalAverage(t_data, Flux, Flux_err, delta):
+@jit(nopython=True, cache=False, parallel=False)
+def RunningOptimalAverage(t_data, Flux, Flux_err, delta,memfunction, gridsize):
     #Inputs
     # Flux : Array of data values
     # Flux_err : Array containig errors of data values
@@ -222,10 +231,11 @@ def RunningOptimalAverage(t_data, Flux, Flux_err, delta):
     # t : List of model times 
     # model : List of model fluxes calculated from running optimal average
 
+    #cutom gridsize added 29th August 2024
+    #gridsize=1000
 
-    gridsize=1000
-
-    
+    if gridsize == None: gridsize=1000
+        
     mx=max(t_data)
     mn=min(t_data)
     length = abs(mx-mn)
@@ -243,16 +253,20 @@ def RunningOptimalAverage(t_data, Flux, Flux_err, delta):
 
         if (len(np.where(np.absolute(t[j]-t_data) < 5.0*delta)[0])<1):
             #Define Gaussian Memory Function
-            w =  np.exp(-0.5*(((t[j]-t_data)/delta)**2))/(Flux_err**2)
+            if memfunction == 'gaussian':
+                w =  np.exp(-0.5*(((t[j]-t_data)/delta)**2))/(Flux_err**2)
         
             #1/cosh Memory Function
-            #w = 1.0/((Flux_err**2)*np.cosh((t[j]-t_data)/delta))
+            if memfunction == 'invcosh':
+                w = 1.0/((Flux_err**2)*np.cosh((t[j]-t_data)/delta))
             
             #Lorentzian
-            #w = 1.0/((Flux_err**2)*(1.0+((t[j]-t_data)/delta)**2))
+            if memfunction == 'lorentzian':
+                w = 1.0/((Flux_err**2)*(1.0+((t[j]-t_data)/delta)**2))
           
             #Boxcar
-            #w=np.full(len(Flux_err), 0.01) # zero
+            if memfunction == 'boxcar':
+                w=np.full(len(Flux_err), 0.01) # zero
           
 
             
@@ -386,7 +400,7 @@ def CalcWinds(t_data, Flux, Flux_err, delta, rmss, N, sizes,  taus, psi_types, w
 
 
 
-@jit(nopython=True, cache=True, parallel=True)
+@jit(nopython=True, cache=False, parallel=False)
 def RunningOptimalAverageConv(t_data, Flux, Flux_err, deltas, factors, conv, t):
     #Inputs
     # Flux : Array of data values
@@ -474,7 +488,7 @@ def RunningOptimalAverageConv(t_data, Flux, Flux_err, deltas, factors, conv, t):
 
 
 
-@jit(nopython=True, cache=True, parallel=True)
+@jit(nopython=True, cache=False, parallel=False)
 def RunningOptimalAverageOutConv(mjd, t_data, Flux, Flux_err, factors, conv, prev, t, delta):
     #Inputs
     # Flux : Array of data values
@@ -560,8 +574,8 @@ def RunningOptimalAverageOutConv(mjd, t_data, Flux, Flux_err, factors, conv, pre
 
 
 
-@jit(nopython=True, cache=True, parallel=True)
-def CalculateP(t_data, Flux, Flux_err, delta):
+@jit(nopython=True, cache=False, parallel=False)
+def CalculateP(t_data, Flux, Flux_err, delta,memfunction):
 
     Ps = np.empty(len(t_data))
     for i in prange(len(t_data)):
@@ -574,32 +588,40 @@ def CalculateP(t_data, Flux, Flux_err, delta):
         
         if (len(np.where(np.absolute(t_data[i]-t_data) < 5.0*delta)[0])==0):
             #Define Gaussian Memory Function
-            w =np.exp(-0.5*(((t_data[i]-t_data)/delta)**2))/(Flux_err**2)
+            if memfunction == 'gaussian':
+                w =np.exp(-0.5*(((t_data[i]-t_data)/delta)**2))/(Flux_err**2)
 
             #1/cosh Memory function
-            #w = 1.0/((Flux_err**2)*np.cosh((t_data[i]-t_data)/delta))
+            if memfunction == 'invcosh':
+                w = 1.0/((Flux_err**2)*np.cosh((t_data[i]-t_data)/delta))
 
             #Lorentzian
-           # w = 1.0/((Flux_err**2)*(1.0+((t_data[i]-t_data)/delta)**2))
+            if memfunction == 'lorentzian':
+                w = 1.0/((Flux_err**2)*(1.0+((t_data[i]-t_data)/delta)**2))
            
            #Boxcar
-            #w=np.full(len(Flux_err), 0.01)
+            if memfunction == 'boxcar':
+                w = np.full(len(Flux_err), 0.01)
 
             
             
         else:
         
             #Define Gaussian Memory Function
-            w =np.exp(-0.5*(((t_data[i]-t_data_use)/delta)**2))/(Flux_err_use**2)
+            if memfunction == 'gaussian':
+                w =np.exp(-0.5*(((t_data[i]-t_data_use)/delta)**2))/(Flux_err_use**2)
 
             #1/cosh Memory function
-            #w = 1.0/((Flux_err_use**2)*np.cosh((t_data[i]-t_data_use)/delta))
+            if memfunction == 'invcosh':
+                w = 1.0/((Flux_err_use**2)*np.cosh((t_data[i]-t_data_use)/delta))
 
             #Lorentzian
-            #w = 1.0/((Flux_err_use**2)*(1.0+((t_data[i]-t_data_use)/delta)**2))
+            if memfunction == 'lorentzian':
+                w = 1.0/((Flux_err_use**2)*(1.0+((t_data[i]-t_data_use)/delta)**2))
             
             #Boxcar
-            #w=1.0/(Flux_err_use**2)
+            if memfunction == 'boxcar':
+                w = 1.0/(Flux_err_use**2)
         w_sum = np.nansum(w)
 
         #P= P + 1.0/((Flux_err[i]**2)*np.nansum(w))
@@ -648,7 +670,8 @@ def integrand2(x, b):
 
     
 #BIC
-def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delta, P_func, slow_comps, P_slow, init_delta, delay_dist, psi_types, pos_ref, AccDisc, wavelengths, integral, integral2):
+def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delta, P_func, slow_comps,
+        P_slow, init_delta, delay_dist, psi_types, pos_ref, AccDisc, wavelengths, integral, integral2, memfunction, gridsize):
 
     Nchunk = 2
     if (AccDisc == False):
@@ -773,7 +796,7 @@ def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delt
     #Calculate ROA to merged lc
     if (delay_dist == False and AccDisc == False):
 
-        t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta)
+        t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta,memfunction, gridsize)
         
         #Normalise lightcurve
 
@@ -787,7 +810,7 @@ def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delt
         #Calculate no. of parameters
         if (P_func == None):
                                               
-            P=CalculateP(merged_mjd, merged_flux, merged_err, delta)
+            P=CalculateP(merged_mjd, merged_flux, merged_err, delta,memfunction)
         else:
             P = P_func(delta)
          
@@ -795,7 +818,7 @@ def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delt
     else:
         factors, conv, x, d = CalcWinds(merged_mjd, merged_flux, merged_err, delta, rmss, len(data), sizes,  taus, psi_types, wavelengths, T1, b, integral)
         t,m,errs, P = RunningOptimalAverageConv(merged_mjd, merged_flux, merged_err, d, factors, conv, x) 
-        P=CalculateP(merged_mjd, merged_flux, merged_err, delta)
+        P=CalculateP(merged_mjd, merged_flux, merged_err, delta,memfunction)
 
 
 
@@ -894,8 +917,14 @@ def BIC(params, data, add_var, size, sig_level,include_slow_comp, slow_comp_delt
                 ex_term[j] = np.log(((err[j]**2)/(data[i][j,2]**2)))  
                               
             else:
-                chi2[j] =sig_level**2
-                ex_term[j] = np.log(((abs(model[j] - flux[j])/sig_level)**2)/(data[i][j,2]**2))
+                #linear sigma clip
+                chi2[j] = (2 * sig_level / err[j]) * abs(model[j] - flux[j]) - sig_level**2
+                ex_term[j] = np.log(abs(model[j] - flux[j])**2 / chi2[j] / data[i][j,2]**2)
+                
+                #constant sigma clip
+                #chi2[j] =sig_level**2
+                #ex_term[j] = np.log(((abs(model[j] - flux[j])/sig_level)**2)/(data[i][j,2]**2))
+        
         lps[i]=np.sum(chi2 + ex_term) 
     
     lprob = np.sum(lps)  
@@ -1054,7 +1083,9 @@ def log_prior(params, priors, add_var, data, delay_dist, AccDisc, wavelengths, i
     
     
 #Probability
-def log_probability(params, data, priors, add_var, size, sig_level, include_slow_comp, slow_comp_delta,P_func, slow_comps, P_slow, init_delta, delay_dist, psi_types, pos_ref, AccDisc, wavelengths, integral, integral2, init_params_chunks):
+def log_probability(params, data, priors, add_var, size, sig_level, include_slow_comp, slow_comp_delta,P_func, 
+                    slow_comps, P_slow, init_delta, delay_dist, psi_types, pos_ref, AccDisc, wavelengths, integral, integral2, init_params_chunks,
+                    memfunction, gridsize):
 
 
         
@@ -1088,7 +1119,8 @@ def log_probability(params, data, priors, add_var, size, sig_level, include_slow
     lp = log_prior(params, priors, add_var, data, delay_dist,  AccDisc, wavelengths, init_params_chunks)
     if not np.isfinite(lp):
         return -np.inf
-    return lp - BIC(params, data, add_var, size, sig_level, include_slow_comp, slow_comp_delta,P_func, slow_comps, P_slow, init_delta, delay_dist,psi_types, pos_ref, AccDisc, wavelengths, integral, integral2)
+    return lp - BIC(params, data, add_var, size, sig_level, include_slow_comp, slow_comp_delta,P_func, slow_comps, P_slow, 
+                    init_delta, delay_dist,psi_types, pos_ref, AccDisc, wavelengths, integral, integral2,memfunction, gridsize)
 
     
     
@@ -1106,7 +1138,7 @@ def Slow(t, S0, dS, t0):
 def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, 
             Nburnin, include_slow_comp, slow_comp_delta, calc_P, delay_dist,
             psi_types, pos_ref, AccDisc, wavelengths, filters, use_backend, 
-            resume_progress, plot_corner):
+            resume_progress, plot_corner,memfunction, gridsize):
 
     
     Nchunk = 2
@@ -1142,7 +1174,8 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
     pos_chunks = [pos[i:i + chunk_size] for i in range(0, len(pos), chunk_size)]
 
     labels_chunks = [labels[i:i + chunk_size] for i in range(0, len(labels), chunk_size)]
-    
+    pos_min = [pos[i:i + chunk_size] for i in range(0, len(pos), chunk_size)]
+    pos_max = [pos[i:i + chunk_size] for i in range(0, len(pos), chunk_size)]
 
         
     size = 0
@@ -1159,19 +1192,30 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
         sizes[i+1] = len(mjd)   
      
         if (include_slow_comp==True):
-            t_slow, m_slow, errs_slow = RunningOptimalAverage(mjd,flux,err, slow_comp_delta)
+            t_slow, m_slow, errs_slow = RunningOptimalAverage(mjd,flux,err, slow_comp_delta,memfunction, gridsize)
             m_slow = m_slow - np.mean(m_slow)
             m_s = interpolate.interp1d(t_slow, m_slow, kind="linear", fill_value="extrapolate")
             pos_chunks[i][0] = np.median(np.absolute(flux- m_s(mjd) - np.median(flux- m_s(mjd)))) #Set intial A to rms of data
             pos_chunks[i][1] = np.median(flux- m_s(mjd)) #Set initial B to mean of data
+            # Prior A
+            pos_min[i][0] = priors[0][0]*pos_chunks[i][0]
+            pos_max[i][0] = priors[0][1]*pos_chunks[i][0]
+            # Prior B
+            pos_min[i][1] = priors[1][0]*pos_chunks[i][1]
+            pos_max[i][1] = priors[1][1]*pos_chunks[i][1]
 
 
         else:        
             pos_chunks[i][0] = pos_chunks[i][0] + np.median(np.absolute(flux - np.median(flux)))# - m_s(mjd)) #Set intial A to rms of data
             pos_chunks[i][1] = np.median(flux)#- m_s(mjd)) #Set initial B to mean of data
             
-
-            
+            # Prior A
+            pos_min[i][0] = priors[0][0]*pos_chunks[i][0]
+            pos_max[i][0] = priors[0][1]*pos_chunks[i][0]
+            # Prior B
+            pos_min[i][1] = priors[1][0]*pos_chunks[i][1]
+            pos_max[i][1] = priors[1][1]*pos_chunks[i][1]
+     
 
         
 
@@ -1180,10 +1224,15 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
         if(add_var == True):
             pos_chunks[i][-1] =  np.mean(err)/5.0 #0.01 #Set initial V
             labels_chunks[i][-1] = "\u03C3"+str(i)
-            
+            # Prior on extra variance
+            pos_min[i][-1] = priors[-1][0]*pos_chunks[i][-1]
+            pos_max[i][-1] = priors[-1][1]*pos_chunks[i][-1]
             
         if (delay_dist == True and AccDisc == False):
             pos_chunks[i][3] = 1.0
+            # Prior on the width of delay distribution
+            pos_min[i][3] = 0.5
+            pos_max[i][3] = 1.5
             labels_chunks[i][3]="\u0394"+str(i)
        
                        
@@ -1192,6 +1241,8 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
         if (AccDisc == False):        
             labels_chunks[i][2] = "\u03C4" + str(i)
             pos_chunks[i][2] = init_tau[i]
+            pos_min[i][2] = priors[1][0]
+            pos_max[i][2] = priors[1][1]
         #Add shifted data to merged lightcurve        
         for j in range(len(mjd)):
             merged_mjd.append(mjd[j]-init_tau[i])
@@ -1210,7 +1261,7 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
         ps=np.empty(len(deltas))
         for i in tqdm(range(len(deltas))):
 
-            ps[i]=CalculateP(merged_mjd, merged_flux, merged_err, deltas[i])
+            ps[i]=CalculateP(merged_mjd, merged_flux, merged_err, deltas[i],memfunction)
             
         #P as a func of delta
         P_func=interpolate.interp1d(deltas, ps, kind="linear", fill_value="extrapolate")
@@ -1220,16 +1271,16 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
     slow_comps =[]                    
     if (include_slow_comp==True):
         for i in range(len(data)):
-            t_sl, m_sl, errs_sl = RunningOptimalAverage(data[i][:,0], data[i][:,1], data[i][:,2], slow_comp_delta)
+            t_sl, m_sl, errs_sl = RunningOptimalAverage(data[i][:,0], data[i][:,1], data[i][:,2], slow_comp_delta,memfunction, gridsize)
             
             #params, pcov = scipy.optimize.curve_fit(Slow, data[i][:,0], data[i][:,1], p0=[4., -1.0, 59300] ,sigma=data[i][:,2], absolute_sigma=False)
            # perr = np.sqrt(np.diag(pcov))        
-            t_sl=np.linspace(min(data[i][:,0]), max(data[i][:,0]), 1000)
+            t_sl=np.linspace(min(data[i][:,0]), max(data[i][:,0]), gridsize)
             #m_sl = Slow(t_sl, params[0], params[1],params[2])
             #errs_sl = np.zeros(1000)
             #m_sl = Slow(np.linspace(59100, 59500, 1000), params[0], params[1],params[2]) - np.mean(m_sl)            
             slow_comps.append([t_sl, m_sl, errs_sl])
-            P_slow[i] = CalculateP(data[i][:,0], data[i][:,1], data[i][:,2], slow_comp_delta)
+            P_slow[i] = CalculateP(data[i][:,0], data[i][:,1], data[i][:,2], slow_comp_delta,memfunction)
             
 
    
@@ -1265,12 +1316,17 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
         labels_chunks[-1][0] = "\u0394"
         integral=None
         integral2=None
+        # Prior on delta
+        pos_min[-1][0] = priors[-2][0]
+        pos_max[-1][0] = priors[-2][1]
         
     #Store initial values for use in prior
     init_params_chunks = pos_chunks
 
     pos = list(chain.from_iterable(pos_chunks))#Flatten into single array
     labels = list(chain.from_iterable(labels_chunks))#Flatten into single array
+    pos_min = np.array(list(chain.from_iterable(pos_min)))#Flatten into single array
+    pos_max = np.array(list(chain.from_iterable(pos_max)))#Flatten into single array
 
     
     pos_rem = pos_ref*Nchunk + 2
@@ -1278,10 +1334,11 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
 
         pos = np.delete(pos, pos_rem) 
         labels = np.delete(labels, pos_rem)
-    
+        pos_min = np.delete(pos_min, pos_rem) 
+        pos_max = np.delete(pos_max, pos_rem) 
         
 
-    if (delay_dist==True and AccDisc == False):
+    if (delay_dist == True and AccDisc == False):
         if (pos_ref == 0):
             pos = np.delete(pos, [2]) 
             labels = np.delete(labels, [2])
@@ -1297,14 +1354,14 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
     
 
     
-
-    #Define starting position
-    
-    pos = 0.2*np.array(pos)* np.random.randn(int(2.0*Npar), int(Npar - param_delete)) + np.array(pos) + 1e-4* np.random.randn(int(2.0*Npar), int(Npar - param_delete)) 
-
-
-    nwalkers, ndim = pos.shape
-    print("NWalkers="+str(int(2.0*Npar)))
+    #print(pos)
+    ##Define starting position
+    #pos = 0.2*np.array(pos)* np.random.randn(int(2.0*(Npar-param_delete)), int(Npar - param_delete)) + np.array(pos) + 1e-4* np.random.randn(int(2.0*Npar), int(Npar - param_delete)) 
+    #print('JVHS > original',Npar, param_delete)
+    #nwalkers, ndim = pos.shape
+    #print('nwalkers: ',nwalkers,'ndim: ', ndim)
+    #print('pos size',pos.shape)
+    #print("NWalkers="+str(int(2.0*Npar)))
     # Make sure initial positions aren't outside priors
     # priors_upper=[]
     # priors_lower=[]
@@ -1317,6 +1374,22 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
     #     pos[i,:][ pos[i,:] < priors_lower] = priors_lower[pos[i,:] < priors_lower]
 
     
+    # New starting positions
+    psize = pos_max - pos_min
+    
+    print('psize: ', psize)
+    #print('pos_min: ', pos_min)
+    #print('param_delete: ', param_delete)
+    #print('Npar: ', Npar)
+    #print('int(Npar - param_delete)', int(Npar - param_delete))
+    
+
+    pos = [pos_min + psize*np.random.rand(int(Npar - param_delete)) for i in range(2*((Npar-param_delete)))]
+    pos = np.array(pos)
+
+    #print(np.array(pos))
+    np.savetxt('test_initial_points.txt',pos.T)
+    nwalkers, ndim = pos.shape
     #Backend
     if (use_backend == True):
         filename = "Fit.h5"
@@ -1329,7 +1402,9 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
     
     with Pool() as pool:
 
-        sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability, args=[data, priors, add_var, size,sig_level, include_slow_comp, slow_comp_delta, P_func, slow_comps, P_slow, init_delta, delay_dist, psi_types, pos_ref, AccDisc, wavelengths, integral, integral2, init_params_chunks], pool=pool, backend=backend)
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability, args=[data, priors, add_var, size,sig_level, include_slow_comp, 
+                                        slow_comp_delta, P_func, slow_comps, P_slow, init_delta, delay_dist, psi_types, 
+                                        pos_ref, AccDisc, wavelengths, integral, integral2, init_params_chunks,memfunction, gridsize], pool=pool, backend=backend)
         sampler.run_mcmc(pos, Nsamples, progress=True);
 
     #Extract samples with burn-in of 1000
@@ -1505,7 +1580,7 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
     if (delay_dist == False and AccDisc == False):
     
 
-        t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta)
+        t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta,memfunction, gridsize)
 
     
     
@@ -1592,7 +1667,7 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
             mx=max(merged_mjd)
             mn=min(merged_mjd)
             length = abs(mx-mn)
-            t = np.arange(mn, mx, length/(1000)) 
+            t = np.arange(mn, mx, length/(gridsize)) 
 
             
             ts, Xs, errss = RunningOptimalAverageOutConv(t, merged_mjd, merged_flux, merged_err, factors, conv, prev, x, delta_new)
@@ -1666,14 +1741,86 @@ def FullFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples,
 
 
 class Fit():
-    def __init__(self, datadir, objName, filters, priors, init_tau = None, init_delta=1.0,
+    """PyROA Fitting module
+        
+    datadir : str
+        Directory where the data is stored.
+    objName : str
+        Name used in PyROA for the data files.
+    filters : list
+        List of filters used in the PyROA fit.
+    priors : list
+        List of Priors for the different parameters to be used.
+        For delay distributions with with no-delay distribution, the priors
+        are:
+            priors = [[A_lower, A_upper], [B_lower, B_upper], 
+                      [tau_lower, tau_upper],[delta_lower, delta_upper], 
+                      [sig_lower, sig_upper]]
+        For other delay distributions, these are:
+            priors = [[A_lower, A_upper], [B_lower, B_upper], 
+                      [tau_lower, tau_upper],[width_lower, width_upper],
+                      [delta_lower, delta_upper], [sig_lower, sig_upper]]
+                      
+    delay_ref : str, optional
+        Name of the filter used as the reference. Must be contained in
+        "filters" list.
+    init_tau : float or list, optional (deprecated)
+        Set initial values for the tau. It has been changed to use a uniform
+        distribution between the priors to setup the initial walkers.
+    init_delta : float, optional (deprecated)
+        Set initial values for the delta. It has been changed to use a uniform
+        distribution between the priors to setup the initial walkers. 
+    delay_dist : bool, optional
+        Flag to activate the delay distribution fitting mode. Default: False
+        i.e. use a Delta-function.
+    psi_types : str or list, optional
+        List of delay distributions to be used.
+    add_var : bool, optional
+        Flag to include additional variance to the error model. Default: True
+    sig_level : float, optional
+        Sigma-clipping level to cap expansion of errorbars. Default: 4
+    Nsamples: float, optional
+        Number of iterations for the MCMC to run. Default: 10000
+    Nburnin: float, optional
+        Number of iterations to remove as burn-in from the MCMC chains. Default: 0
+    include_slow_comp: bool, optional
+        Flag to include a smooth ROA component before the fitting. Default: False
+    slow_comp_delta: float, optional
+        Width of memory function used in the slow component ROA. Default: 30.0
+    calc_P: bool, optional
+        Calculate no. of parameters for a grid of deltas over the prior range.
+        This is for testing purposes only to check the range of deltas. Default: False
+    AccDisc: bool, optional
+        Flag to activate the fit in accretion disc mode.
+    wavelengths: list, optional
+        List of filter center wavelengths. This is required is using the module in AccDisc mode.
+        Default: None.
+    use_backend: bool, optional
+        Save the progress in an external file (Fit.h5). Default=False
+    resume_progress: bool, optional
+        Flag to resume the fitting from last entry in Fit.h5. Requires the use of "use_backed"
+        flag. Default: False
+    plot_corner: bool, optional
+        Produce a corner plot of all the chains at the end of the fit. Default: False
+    memfunction: str, optional
+        Choose the memopry function used in the ROA. The width of each memory function
+        is determined by the Delta paremeter in the fit. The current choices are:
+            - gaussian: Gaussian function
+            - invcosh: Inverse hyperbolic cosine
+            - lorentzian: Lorentzian function
+            - boxcar: Boxcar function
+    """
+    def __init__(self, datadir, objName, filters, priors, delay_ref = None, init_tau = None, init_delta=1.0,
                  delay_dist=False , psi_types = None, add_var=True, sig_level = 4.0, 
-                 Nsamples=10000, Nburnin=5000, include_slow_comp=False, slow_comp_delta=30.0, 
-                 delay_ref = None, calc_P=False, AccDisc=False, wavelengths=None, 
-                 use_backend = False, resume_progress = False, plot_corner=False):
+                 Nsamples=10000, Nburnin=0, include_slow_comp=False, slow_comp_delta=30.0, 
+                 calc_P=False, AccDisc=False, wavelengths=None, 
+                 use_backend = False, resume_progress = False, plot_corner=False,memfunction='gaussian', gridsize = None):
+        
+        if datadir[-1] != '/': datadir += '/'  #Add forward slash in case it isn't there
         self.datadir=datadir
         self.objName=objName
         self.filters=filters
+        self.gridsize = gridsize
         data=[]
         for i in range(len(filters)):
             file = datadir + str(self.objName) +"_"+ str(self.filters[i]) + ".dat"
@@ -1741,7 +1888,7 @@ class Fit():
                       self.sig_level, self.Nsamples, self.Nburnin, self.include_slow_comp, 
                       self.slow_comp_delta, self.calc_P, self.delay_dist, self.psi_types, 
                       self.delay_ref_pos, self.AccDisc, self.wavelengths, self.filters, 
-                      self.use_backend, self.resume_progress,plot_corner)
+                      self.use_backend, self.resume_progress,plot_corner,memfunction, self.gridsize)
 
         self.samples = run[0]
         self.samples_flat = run[1]
@@ -1761,7 +1908,7 @@ class Fit():
 
 def Plot(Fit):
 
-    plt.style.use(['science','no-latex'])        
+    #plt.style.use(['science','no-latex'])        
     plt.rcParams.update({
             "font.family": "Sans", 
             "font.serif": ["DejaVu"],
@@ -2038,7 +2185,7 @@ def Plot(Fit):
         
         
 #Log Likelihood
-def log_likelihood2(params, data, sig_level):
+def log_likelihood2(params, data, sig_level,memfunction, gridsize):
 
     #Break params list into chunks of 3 i.e A, B, V in each chunk
     params_chunks = [params[i:i + 3] for i in range(0, len(params), 3)] 
@@ -2083,8 +2230,8 @@ def log_likelihood2(params, data, sig_level):
 
     
     #Calculate ROA to merged lc
-    t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta)
-    P=CalculateP(merged_mjd, merged_flux, merged_err, delta)
+    t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta,memfunction, gridsize)
+    P=CalculateP(merged_mjd, merged_flux, merged_err, delta,memfunction)
 
     
     
@@ -2168,7 +2315,10 @@ def log_prior2(params, priors, s, init_params_chunks):
     for i in range(s):
         A = params_chunks[i][0]
         B = params_chunks[i][1]
-        sig = params_chunks[i][2]/(init_params_chunks[i][2]*5.0)
+        sig = params_chunks[i][2]
+        # Removed the /(init_params_chunks[i][2]*5.0) as we don't understand
+        # its origin and believe its wrong. NEEDS CHECKING!
+        #sig = params_chunks[i][2]/(init_params_chunks[i][2]*5.0)
         
         B_prior_width=0.5 # mJy
         lnA_prior_width=0.02 # 0.02 = 2%
@@ -2194,11 +2344,11 @@ def log_prior2(params, priors, s, init_params_chunks):
     
     
 #Probability
-def log_probability2(params, data, priors, sig_level, init_params_chunks):
+def log_probability2(params, data, priors, sig_level, init_params_chunks,memfunction, gridsize):
     lp = log_prior2(params, priors, len(data), init_params_chunks)
     if not np.isfinite(lp):
         return -np.inf
-    return lp + log_likelihood2(params, data, sig_level)
+    return lp + log_likelihood2(params, data, sig_level,memfunction, gridsize)
     
     
     
@@ -2206,7 +2356,7 @@ def log_probability2(params, data, priors, sig_level, init_params_chunks):
 
 
 
-def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter,plot_corner):
+def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter,plot_corner,memfunction, gridsize):
 
     ########################################################################################    
     #Run MCMC to fit to data
@@ -2217,6 +2367,9 @@ def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter,pl
     labels = [None]*(3*len(data) + 1)
     pos_chunks = [pos[i:i + 3] for i in range(0, len(pos), 3)]
     labels_chunks = [labels[i:i + 3] for i in range(0, len(labels), 3)]
+    pos_min = [pos[i:i + 3] for i in range(0, len(pos), 3)]
+    pos_max = [pos[i:i + 3] for i in range(0, len(pos), 3)]
+    
     for i in range(len(data)):
         mjd = data[i][:,0]
         flux = data[i][:,1]
@@ -2229,7 +2382,19 @@ def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter,pl
         labels_chunks[i][0] = "A"+str(i+1)
         labels_chunks[i][1] = "B"+str(i+1)        
         labels_chunks[i][2] = "\u03C3"+str(i+1)                
-        
+
+        # New lower and maximum values for the priors
+        pos_min[i][0] = 0.0
+        pos_min[i][1] = -0.5*10
+        pos_min[i][2] = priors[1][0]
+
+        pos_max[i][0] = 2.0
+        pos_max[i][1] = 0.5*10
+        pos_max[i][2] = priors[1][1]
+
+    pos_min[-1][0] = priors[0][0]
+    pos_max[-1][0] = priors[0][1]
+    
     pos_chunks[-1][0] = init_delta#Initial delta
     labels_chunks[-1][0] = "\u0394"
     #Store initial values for use in prior
@@ -2237,20 +2402,34 @@ def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter,pl
 
     pos = list(chain.from_iterable(pos_chunks))#Flatten into single array
     labels = list(chain.from_iterable(labels_chunks))#Flatten into single array     
-    
+
+    pos_min = np.array(list(chain.from_iterable(pos_min)))#Flatten into single array
+    pos_max = np.array(list(chain.from_iterable(pos_max)))#Flatten into single array
 
     print("Initial Parameter Values")
     table =[pos]
     print(tabulate(table, headers=labels))
 
     #Define starting position
-    pos = 0.2*np.array(pos)* np.random.randn(int(2.0*Npar), int(Npar)) + np.array(pos) + 1e-4* np.random.randn(int(2.0*Npar), int(Npar)) 
+    #pos = 0.2*np.array(pos)* np.random.randn(int(2.0*Npar), int(Npar)) + np.array(pos) + 1e-4* np.random.randn(int(2.0*Npar), int(Npar)) 
+
     print("NWalkers="+str(int(2.0*Npar)))
+    print(np.random.rand(Npar))
+
+    
+    # New starting positions
+    psize = pos_max - pos_min
+    pos = [pos_min + psize*np.random.rand(Npar) for i in range(2*Npar)]
+    pos = np.array(pos)
+
+    #print(np.array(pos))
+    np.savetxt('test_initial_points.txt',pos.T)
     nwalkers, ndim = pos.shape
+    
     with Pool() as pool:
 
         sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability2, 
-                                        args=(data, priors, sig_level, init_params_chunks), pool=pool)
+                                        args=(data, priors, sig_level, init_params_chunks,memfunction, gridsize), pool=pool)
         sampler.run_mcmc(pos, Nsamples, progress=True);
     
     #Extract samples with burn-in of 1000
@@ -2307,7 +2486,7 @@ def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter,pl
     params.append([delta])
     params = list(chain.from_iterable(params))#Flatten into single array
     #Calculate ROA to merged lc
-    t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta)
+    t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta,memfunction, gridsize)
     
     Calibrated_mjd = []
     Calibrated_flux = []
@@ -2384,8 +2563,8 @@ def InterCalib(data, priors, init_delta, sig_level, Nsamples, Nburnin, filter,pl
 
 
 class InterCalibrate():
-    def __init__(self, datadir, objName, filter, scopes, priors, init_delta=1.0, sig_level = 4.0,
-                 Nsamples=15000, Nburnin=10000,plot_corner=False):
+    def __init__(self, datadir, objName, filter, scopes, priors, init_delta=1.0, sig_level = 3.0,
+                 Nsamples=15000, Nburnin=10000,plot_corner=False,memfunction='gaussian'):
         self.datadir=datadir
         self.objName=objName
         self.filter=filter
@@ -2411,7 +2590,7 @@ class InterCalibrate():
 
         
         run = InterCalib(data, self.priors, self.init_delta, self.sig_level, self.Nsamples, 
-                        self.Nburnin, self.filter,plot_corner)
+                        self.Nburnin, self.filter,plot_corner,memfunction)
 
         self.samples = run[0]
         self.samples_flat = run[1]
@@ -2605,8 +2784,8 @@ def log_likelihood3(params, data, add_var, size, sig_level):
 
     
     #Calculate ROA to merged lc
-    t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta)
-    P=CalculateP(merged_mjd, merged_flux, merged_err, delta)
+    t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta,memfunction, gridsize)
+    P=CalculateP(merged_mjd, merged_flux, merged_err, delta, memfunction)
 
 
     #Normalise lightcurve
@@ -2823,7 +3002,7 @@ def LensFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
         #Find initial polynomial coeff.
         
         
-        t,m,errs = RunningOptimalAverage(data[0][:,0], data[0][:,1], data[0][:,2], init_delta)
+        t,m,errs = RunningOptimalAverage(data[0][:,0], data[0][:,1], data[0][:,2], init_delta, memfunction, gridsize)
         t_shifted = t + init_tau[i]
         interp = interpolate.interp1d(t_shifted, m, kind="linear", fill_value="extrapolate")
         m1 = interp(mjd)    
@@ -3007,11 +3186,11 @@ def LensFit(data, priors, init_tau, init_delta, add_var, sig_level, Nsamples, Nb
     params=np.delete(params, [0,1, 2, 3, 4, 5])    
 
     #Calculate ROA to merged lc
-    t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta)
+    t, m, errs = RunningOptimalAverage(merged_mjd, merged_flux, merged_err, delta,memfunction, gridsize)
     #Normalise lightcurve
     m_mean = np.mean(m)#np.average(m, weights = 1.0/(errs**2))
     m_rms = np.std(m)
-    t, m, errs = RunningOptimalAverageOutp(merged_mjd, merged_flux, merged_err, delta)
+    t, m, errs = RunningOptimalAverageOutp(merged_mjd, merged_flux, merged_err, delta,memfunction, gridsize)
     m = (m-m_mean)/m_rms
     errs = errs/m_rms
     #Remove first tau
@@ -3249,12 +3428,3 @@ class GravLensFit():
         fig.savefig('{}{:d}.pdf'.format("GravLensPlot", i))
         #plt.close()      
         
-        
-        
-        
-        
-        
-        
-        
-        
-
