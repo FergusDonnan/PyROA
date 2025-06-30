@@ -15,7 +15,7 @@ import numba
 from numba import jit
 from numba import prange
 from numba.typed import List
-from numba import generated_jit, types
+from numba import types
 from scipy import special
 import scipy.special
 import matplotlib
